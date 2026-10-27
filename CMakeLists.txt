@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(IsolateGalgame)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_AUTOMOC ON) 
 include_directories(${CMAKE_SOURCE_DIR}/include)
-# 告诉 CMake，源码在 src 文件夹里！
-add_executable(game_server src/server.cpp)
-target_link_libraries(game_server sqlite3)
-add_executable(game_client src/client.cpp)
+find_package(Qt5 COMPONENTS Widgets REQUIRED)
+add_executable(galgame src/main.cpp)
+target_link_libraries(galgame sqlite3)
+add_executable(qt_client src/qt_main.cpp)
+target_link_libraries(qt_client Qt5::Widgets sqlite3)

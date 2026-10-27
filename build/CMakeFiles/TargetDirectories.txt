@@ -1,4 +1,6 @@
-/home/cyc/galgame1/build/CMakeFiles/game_server.dir
-/home/cyc/galgame1/build/CMakeFiles/game_client.dir
+/home/cyc/galgame1/build/CMakeFiles/galgame.dir
+/home/cyc/galgame1/build/CMakeFiles/qt_client.dir
 /home/cyc/galgame1/build/CMakeFiles/edit_cache.dir
 /home/cyc/galgame1/build/CMakeFiles/rebuild_cache.dir
+/home/cyc/galgame1/build/CMakeFiles/galgame_autogen.dir
+/home/cyc/galgame1/build/CMakeFiles/qt_client_autogen.dir

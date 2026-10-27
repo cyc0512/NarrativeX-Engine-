@@ -117,78 +117,152 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named game_server
+# Target rules for targets named galgame
 
 # Build rule for target.
-game_server: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 game_server
-.PHONY : game_server
+galgame: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 galgame
+.PHONY : galgame
 
 # fast build rule for target.
-game_server/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_server.dir/build.make CMakeFiles/game_server.dir/build
-.PHONY : game_server/fast
+galgame/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/build
+.PHONY : galgame/fast
 
 #=============================================================================
-# Target rules for targets named game_client
+# Target rules for targets named qt_client
 
 # Build rule for target.
-game_client: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 game_client
-.PHONY : game_client
+qt_client: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 qt_client
+.PHONY : qt_client
 
 # fast build rule for target.
-game_client/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_client.dir/build.make CMakeFiles/game_client.dir/build
-.PHONY : game_client/fast
+qt_client/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/build
+.PHONY : qt_client/fast
 
-src/client.o: src/client.cpp.o
-.PHONY : src/client.o
+#=============================================================================
+# Target rules for targets named galgame_autogen
+
+# Build rule for target.
+galgame_autogen: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 galgame_autogen
+.PHONY : galgame_autogen
+
+# fast build rule for target.
+galgame_autogen/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame_autogen.dir/build.make CMakeFiles/galgame_autogen.dir/build
+.PHONY : galgame_autogen/fast
+
+#=============================================================================
+# Target rules for targets named qt_client_autogen
+
+# Build rule for target.
+qt_client_autogen: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 qt_client_autogen
+.PHONY : qt_client_autogen
+
+# fast build rule for target.
+qt_client_autogen/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client_autogen.dir/build.make CMakeFiles/qt_client_autogen.dir/build
+.PHONY : qt_client_autogen/fast
+
+galgame_autogen/mocs_compilation.o: galgame_autogen/mocs_compilation.cpp.o
+.PHONY : galgame_autogen/mocs_compilation.o
 
 # target to build an object file
-src/client.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_client.dir/build.make CMakeFiles/game_client.dir/src/client.cpp.o
-.PHONY : src/client.cpp.o
+galgame_autogen/mocs_compilation.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/galgame_autogen/mocs_compilation.cpp.o
+.PHONY : galgame_autogen/mocs_compilation.cpp.o
 
-src/client.i: src/client.cpp.i
-.PHONY : src/client.i
+galgame_autogen/mocs_compilation.i: galgame_autogen/mocs_compilation.cpp.i
+.PHONY : galgame_autogen/mocs_compilation.i
 
 # target to preprocess a source file
-src/client.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_client.dir/build.make CMakeFiles/game_client.dir/src/client.cpp.i
-.PHONY : src/client.cpp.i
+galgame_autogen/mocs_compilation.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/galgame_autogen/mocs_compilation.cpp.i
+.PHONY : galgame_autogen/mocs_compilation.cpp.i
 
-src/client.s: src/client.cpp.s
-.PHONY : src/client.s
+galgame_autogen/mocs_compilation.s: galgame_autogen/mocs_compilation.cpp.s
+.PHONY : galgame_autogen/mocs_compilation.s
 
 # target to generate assembly for a file
-src/client.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_client.dir/build.make CMakeFiles/game_client.dir/src/client.cpp.s
-.PHONY : src/client.cpp.s
+galgame_autogen/mocs_compilation.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/galgame_autogen/mocs_compilation.cpp.s
+.PHONY : galgame_autogen/mocs_compilation.cpp.s
 
-src/server.o: src/server.cpp.o
-.PHONY : src/server.o
+qt_client_autogen/mocs_compilation.o: qt_client_autogen/mocs_compilation.cpp.o
+.PHONY : qt_client_autogen/mocs_compilation.o
 
 # target to build an object file
-src/server.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_server.dir/build.make CMakeFiles/game_server.dir/src/server.cpp.o
-.PHONY : src/server.cpp.o
+qt_client_autogen/mocs_compilation.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/qt_client_autogen/mocs_compilation.cpp.o
+.PHONY : qt_client_autogen/mocs_compilation.cpp.o
 
-src/server.i: src/server.cpp.i
-.PHONY : src/server.i
+qt_client_autogen/mocs_compilation.i: qt_client_autogen/mocs_compilation.cpp.i
+.PHONY : qt_client_autogen/mocs_compilation.i
 
 # target to preprocess a source file
-src/server.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_server.dir/build.make CMakeFiles/game_server.dir/src/server.cpp.i
-.PHONY : src/server.cpp.i
+qt_client_autogen/mocs_compilation.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/qt_client_autogen/mocs_compilation.cpp.i
+.PHONY : qt_client_autogen/mocs_compilation.cpp.i
 
-src/server.s: src/server.cpp.s
-.PHONY : src/server.s
+qt_client_autogen/mocs_compilation.s: qt_client_autogen/mocs_compilation.cpp.s
+.PHONY : qt_client_autogen/mocs_compilation.s
 
 # target to generate assembly for a file
-src/server.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/game_server.dir/build.make CMakeFiles/game_server.dir/src/server.cpp.s
-.PHONY : src/server.cpp.s
+qt_client_autogen/mocs_compilation.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/qt_client_autogen/mocs_compilation.cpp.s
+.PHONY : qt_client_autogen/mocs_compilation.cpp.s
+
+src/main.o: src/main.cpp.o
+.PHONY : src/main.o
+
+# target to build an object file
+src/main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/src/main.cpp.o
+.PHONY : src/main.cpp.o
+
+src/main.i: src/main.cpp.i
+.PHONY : src/main.i
+
+# target to preprocess a source file
+src/main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/src/main.cpp.i
+.PHONY : src/main.cpp.i
+
+src/main.s: src/main.cpp.s
+.PHONY : src/main.s
+
+# target to generate assembly for a file
+src/main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/galgame.dir/build.make CMakeFiles/galgame.dir/src/main.cpp.s
+.PHONY : src/main.cpp.s
+
+src/qt_main.o: src/qt_main.cpp.o
+.PHONY : src/qt_main.o
+
+# target to build an object file
+src/qt_main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/src/qt_main.cpp.o
+.PHONY : src/qt_main.cpp.o
+
+src/qt_main.i: src/qt_main.cpp.i
+.PHONY : src/qt_main.i
+
+# target to preprocess a source file
+src/qt_main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/src/qt_main.cpp.i
+.PHONY : src/qt_main.cpp.i
+
+src/qt_main.s: src/qt_main.cpp.s
+.PHONY : src/qt_main.s
+
+# target to generate assembly for a file
+src/qt_main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/qt_client.dir/build.make CMakeFiles/qt_client.dir/src/qt_main.cpp.s
+.PHONY : src/qt_main.cpp.s
 
 # Help Target
 help:
@@ -198,14 +272,22 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... game_client"
-	@echo "... game_server"
-	@echo "... src/client.o"
-	@echo "... src/client.i"
-	@echo "... src/client.s"
-	@echo "... src/server.o"
-	@echo "... src/server.i"
-	@echo "... src/server.s"
+	@echo "... galgame_autogen"
+	@echo "... qt_client_autogen"
+	@echo "... galgame"
+	@echo "... qt_client"
+	@echo "... galgame_autogen/mocs_compilation.o"
+	@echo "... galgame_autogen/mocs_compilation.i"
+	@echo "... galgame_autogen/mocs_compilation.s"
+	@echo "... qt_client_autogen/mocs_compilation.o"
+	@echo "... qt_client_autogen/mocs_compilation.i"
+	@echo "... qt_client_autogen/mocs_compilation.s"
+	@echo "... src/main.o"
+	@echo "... src/main.i"
+	@echo "... src/main.s"
+	@echo "... src/qt_main.o"
+	@echo "... src/qt_main.i"
+	@echo "... src/qt_main.s"
 .PHONY : help
 
 
