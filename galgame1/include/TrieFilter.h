@@ -12,14 +12,14 @@ private:
     
     TrieNode* root;
 
-    // 辅助函数：按 UTF-8 规则安全提取字符（支持中英文混合）
+    // 按 UTF-8 规则安全提取字符
     std::string getUTF8Char(const std::string& text, size_t& i) {
         if (i >= text.length()) return "";
         unsigned char c = text[i];
         int len = 1;
-        if ((c >> 5) == 0x06) len = 2;      // 2字节字符
-        else if ((c >> 4) == 0x0E) len = 3; // 3字节中文字符
-        else if ((c >> 3) == 0x1E) len = 4; // 4字节字符
+        if ((c >> 5) == 0x06) len = 2;      
+        else if ((c >> 4) == 0x0E) len = 3; 
+        else if ((c >> 3) == 0x1E) len = 4; 
         
         std::string ch = text.substr(i, len);
         i += len - 1; 

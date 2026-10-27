@@ -1,0 +1,30 @@
+{
+    "nodes": {
+        "0": {
+            "npc_text": "小雅：你好呀。今天天气真好呢。",
+            "rules": [
+                {
+                    "regex": "(漂亮|好看|可爱)",
+                    "reply": "小雅：哎呀，你嘴真甜... (脸红了)",
+                    "affinity": 10,
+                    "next_node": "1"
+                }
+            ],
+            "default_reply": "小雅：嗯...你说的很有意思呢。",
+            "default_next": "0"
+        },
+        "1": {
+            "npc_text": "小雅：你平时喜欢做什么呀？",
+            "rules": [
+                {
+                    "regex": "(代码|编程)",
+                    "reply": "小雅：哇，写代码好厉害！",
+                    "affinity": 15,
+                    "next_node": "-1"
+                }
+            ],
+            "default_reply": "小雅：听起来很有趣呢！",
+            "default_next": "1"
+        }
+    }
+}
