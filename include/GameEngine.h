@@ -3,9 +3,10 @@
 #include <string>
 #include <regex>
 #include <fstream>
-#include <vector> // 必须加
+#include <vector> 
 #include "json.hpp" 
 #include "DatabaseManager.h" 
+#include "AiEngine.h"
 
 using json = nlohmann::json;
 
@@ -15,7 +16,8 @@ private:
     std::string currentNode;   
     int affinity = 0;          
     std::string playerName;    
-    DatabaseManager* db;       
+    DatabaseManager* db;
+    std::string lastAiReply;       
 
 public:
     GameEngine(const std::string& jsonPath) {
@@ -112,20 +114,27 @@ public:
                 }
             }
         } else {
-            reply = current_node_data["default_reply"].get<std::string>();
-            for (const auto& rule : current_node_data["rules"]) {
-                if (rule.contains("require_affinity") && affinity < rule["require_affinity"].get<int>()) {
-                    continue; 
-                }
-                std::regex pattern(rule["regex"].get<std::string>());
-                if (std::regex_search(processedInput, pattern)) {
-                    reply = rule["reply"].get<std::string>();
-                    affinity += rule["affinity"].get<int>();
-                    nextNode = rule["next_node"].get<std::string>();
-                    reply += "\n【好感度 +" + std::to_string(rule["affinity"].get<int>()) + "】\n";
-                    break; 
-                }
+            // 👇 把玩家的话丢给 AI 处理
+            std::cout << "【系统】木因子正在思考中...\n";
+            json aiResult = AiEngine::analyzeInput(processedInput, affinity);
+            
+            // 👇 这里加上了最强防御！避免任何崩溃！
+            if (aiResult.contains("reply") && aiResult["reply"].is_string()) {
+                reply = aiResult["reply"].get<std::string>();
+                lastAiReply = reply;
+            } else {
+                reply = "（木因子看着你，似乎不知道该说什么。）";
             }
+            
+            int affinityChange = 0;
+            if (aiResult.contains("affinity_change") && aiResult["affinity_change"].is_number()) {
+                affinityChange = aiResult["affinity_change"].get<int>();
+            }
+            
+            affinity += affinityChange;
+            reply += "\n【好感度 " + std::to_string(affinityChange) + "，当前好感: " + std::to_string(affinity) + "】\n";
+            
+            nextNode = current_node_data["default_next"].get<std::string>();
         }
 
         currentNode = nextNode;
@@ -136,11 +145,13 @@ public:
 
     bool isGameOver() { return currentNode == "-1"; }
 
-    // 透传数据库操作接口给 Qt
     std::vector<DatabaseManager::SaveInfo> getAllSaves() {
         return db->getAllSaves();
     }
-    
+        std::string getLastAiReply() {
+        return lastAiReply;
+    }
+
     void deleteSaveData(const std::string& name) {
         db->deleteSave(name);
     }

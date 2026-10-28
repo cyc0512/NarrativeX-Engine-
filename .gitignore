@@ -1,2 +1,4 @@
 build/
+private/
 .vscode-server/
+config.json

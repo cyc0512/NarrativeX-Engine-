@@ -20,7 +20,8 @@
 #include <string>
 #include "GameEngine.h"
 #include "SecurityFilter.h"
-
+#include <QtConcurrent>
+#include <QFutureWatcher>
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
@@ -300,11 +301,11 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    // 发送按钮绑定
     QObject::connect(sendBtn, &QPushButton::clicked, [&]() {
         QString text = inputBox->text();
         if (text.isEmpty()) return;
         
+        // 安检拦截
         if (security.checkSecurity(text.toStdString())) {
             QMessageBox::warning(&window, "警告", "检测到不文明用语，好感度扣除！");
             engine.applyPenalty(-20);
@@ -314,13 +315,48 @@ int main(int argc, char *argv[]) {
             return;
         }
 
+        // 记录玩家发言
         narratorArea->append("\033[34m> " + text + "\033[0m");
-        engine.processInput(text.toStdString());
+        
         inputBox->clear();
         inputWidget->hide();
-        refreshUI(); 
-    });
+        
+        // 锁定界面，显示正在思考
+        dialogBox->setText("木因子正在思考中......");
+        sendBtn->setDisabled(true);
 
+        // 启动后台线程发送网络请求
+        QFuture<std::string> future = QtConcurrent::run([&, text]() {
+            std::string reply = engine.processInput(text.toStdString());
+            return reply;
+        });
+
+        // 监控任务完成
+        QFutureWatcher<std::string> *watcher = new QFutureWatcher<std::string>(&window);
+        
+        QObject::connect(watcher, &QFutureWatcher<std::string>::finished, [&, watcher]() {
+            std::string fullReply = watcher->result();
+            std::string aiText = engine.getLastAiReply();
+            
+            if (aiText.empty()) {
+                aiText = fullReply;
+            }
+
+            // 直接把 AI 的话显示在大黑框里！
+            dialogBox->setText(QString::fromStdString(aiText));
+            
+            // 在旁白区域记录一下好感度变化
+            narratorArea->append("【木因子】" + QString::fromStdString(aiText));
+            narratorArea->append(QString::fromStdString(fullReply));
+
+            sendBtn->setDisabled(false);
+            watcher->deleteLater(); 
+            
+            // 注意：这里绝对不要调用 refreshUI()，否则 AI 的台词会被剧本原有台词覆盖！
+        });
+        
+        watcher->setFuture(future);
+    });
     // 页面与按钮绑定
     stackedWidget->addWidget(mainMenuPage);
     stackedWidget->addWidget(gamePage);
