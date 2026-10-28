@@ -2,12 +2,14 @@
 #include <string>
 #include <limits>
 #include <vector>
+#include <termios.h> 
+#include <unistd.h>  
 #include "GameEngine.h"
 #include "SecurityFilter.h"
 
 void printMainMenu() {
     std::cout << "\n=========================================\n";
-    std::cout << "        🌸 高三恋爱文字冒险 🌸\n";
+    std::cout << "        🌸ISOLATE 🌸\n";
     std::cout << "=========================================\n";
     std::cout << "  1. 开始新游戏\n";
     std::cout << "  2. 读取已有存档\n";
@@ -19,6 +21,9 @@ void printMainMenu() {
 }
 
 int main() {
+    struct termios oldt, newt;
+    tcgetattr(STDIN_FILENO, &oldt);
+
     GameEngine engine("../data/story.json");
     SecurityFilter security;
 
@@ -29,22 +34,24 @@ int main() {
         std::string choice;
         std::getline(std::cin, choice);
 
-        // 公共游戏主循环
         auto enterGame = [&]() {
             bool inGame = true;
             while (inGame) {
                 std::vector<std::string> pages = engine.getCurrentNodePages();
                 
-                // 翻页逻辑：按 Tab + 回车 翻页
+                newt = oldt;
+                newt.c_lflag &= ~(ICANON | ECHO);
+                tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
                 for (const auto& page : pages) {
                     std::cout << "\n" << page;
-                    std::cout << "\033[90m(按 Tab 键然后回车继续...)\033[0m\n";
+                    std::cout << "\033[90m(按空格键继续...)\033[0m";
                     
-                    std::string input;
-                    std::getline(std::cin, input); // 等待玩家输入并回车
-                    
-                    // 👇 只要玩家输入的包含 Tab 或者直接按了回车，就翻页
-                    // 这里我们宽容一点，如果玩家直接按回车也让他翻，免得卡住
+                    char ch = std::cin.get(); 
+                    while (ch != ' ') {
+                        ch = std::cin.get();
+                    }
+                    std::cout << "\n"; 
                 }
 
                 if (engine.isGameOver()) {
@@ -53,7 +60,8 @@ int main() {
                     break;
                 }
 
-                // 等待玩家对话输入
+                tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
                 std::cout << "\n\033[34m> \033[0m";
                 std::string userInput;
                 std::getline(std::cin, userInput);
@@ -88,16 +96,25 @@ int main() {
             std::getline(std::cin, playerName);
             if (engine.loadExistingPlayer(playerName)) {
                 enterGame(); 
+            } else {
+                std::cout << "【系统】找不到该玩家的存档！\n";
             }
         } 
         else if (choice == "3") {
-            engine.showAllSaves();
+            // 👇 终端版直接调用 getAllSaves 打印
+            auto saves = engine.getAllSaves();
+            std::cout << "\n--- 存档列表 ---\n";
+            for (const auto& s : saves) {
+                std::cout << "玩家: " << s.playerName << " | 好感度: " << s.affinity << "\n";
+            }
+            std::cout << "----------------\n";
         }
         else if (choice == "4") {
             std::cout << "请输入要删除的玩家名: ";
             std::string delName;
             std::getline(std::cin, delName);
             engine.deleteSaveData(delName);
+            std::cout << "【系统】删除操作完成。\n";
         }
         else if (choice == "5") {
             std::cout << "【系统】感谢游玩，再见！\n";
@@ -105,5 +122,6 @@ int main() {
         }
     }
 
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     return 0;
 }

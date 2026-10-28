@@ -11,6 +11,10 @@
 #include <QInputDialog>
 #include <QPixmap>
 #include <QImage>
+#include <QStackedWidget>
+#include <QMenu>
+#include <QAction>
+#include <QPoint>
 #include <functional>
 #include <vector>
 #include <string>
@@ -20,23 +24,15 @@
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
-    // 初始化游戏引擎和安全过滤
     GameEngine engine("../data/story.json");
     SecurityFilter security;
 
-    // 让玩家先输入名字
-    bool ok;
-    QString name = QInputDialog::getText(NULL, "游戏启动", "请输入你的名字:", QLineEdit::Normal, "", &ok);
-    if (!ok || name.isEmpty()) return 0;
-    engine.createNewPlayer(name.toStdString());
-
-    // 创建主窗口
     QWidget window;
-    window.setWindowTitle("高三恋爱文字冒险");
+    window.setWindowTitle("ISOLATE - 文字冒险游戏");
     window.resize(1000, 700); 
     window.setStyleSheet("background-color: #1a1a1a;");
 
-    // 1. 背景图
+    // 背景图
     QLabel *bgLabel = new QLabel(&window);
     bgLabel->setGeometry(0, 0, 1000, 700);
     QImage bgImage("../assets/bg.jpg");
@@ -45,34 +41,84 @@ int main(int argc, char *argv[]) {
         bgLabel->setPixmap(bgPixmap);
         bgLabel->setScaledContents(true);
     } else {
-        bgLabel->setText("【图片未找到：请检查 assets/bg.jpg】");
-        bgLabel->setStyleSheet("color: red; font-size: 24px;");
+        bgLabel->setText("【图片未找到】");
         bgLabel->setAlignment(Qt::AlignCenter);
     }
 
-    // 2. 旁白区域（占据上方大部分空间，半透明，可滚动阅读）
-    QTextEdit *narratorArea = new QTextEdit(&window);
+    QStackedWidget *stackedWidget = new QStackedWidget(&window);
+    stackedWidget->setGeometry(0, 0, 1000, 700);
+    stackedWidget->setStyleSheet("background: transparent;");
+
+    // 页面 1：主菜单
+    QWidget *mainMenuPage = new QWidget();
+    QVBoxLayout *mainMenuLayout = new QVBoxLayout(mainMenuPage);
+    mainMenuLayout->setAlignment(Qt::AlignCenter);
+
+    QLabel *titleLabel = new QLabel("ISOLATE", mainMenuPage);
+    titleLabel->setFont(QFont("Microsoft YaHei", 60, QFont::Bold));
+    titleLabel->setStyleSheet("color: white; margin-bottom: 40px;");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    mainMenuLayout->addWidget(titleLabel);
+
+    QPushButton *startBtn = new QPushButton("开始新游戏", mainMenuPage);
+    startBtn->setFixedSize(250, 50);
+    startBtn->setStyleSheet("QPushButton { background-color: rgba(30, 30, 30, 200); color: white; font-size: 18px; border-radius: 10px; border: 1px solid #7f8c8d; } QPushButton:hover { background-color: rgba(52, 152, 219, 220); }");
+    mainMenuLayout->addWidget(startBtn, 0, Qt::AlignCenter);
+
+    QPushButton *openLoadPanelBtn = new QPushButton("读取存档", mainMenuPage);
+    openLoadPanelBtn->setFixedSize(250, 50);
+    openLoadPanelBtn->setStyleSheet(startBtn->styleSheet());
+    mainMenuLayout->addWidget(openLoadPanelBtn, 0, Qt::AlignCenter);
+
+    QPushButton *quitBtn = new QPushButton("退出游戏", mainMenuPage);
+    quitBtn->setFixedSize(250, 50);
+    quitBtn->setStyleSheet(startBtn->styleSheet());
+    mainMenuLayout->addWidget(quitBtn, 0, Qt::AlignCenter);
+
+    // 存档面板
+    QWidget *loadPanel = new QWidget(&window);
+    loadPanel->setGeometry(150, 100, 700, 500);
+    loadPanel->setStyleSheet("background-color: rgba(20, 20, 20, 240); border-radius: 15px; border: 2px solid #7f8c8d;");
+    loadPanel->hide();
+
+    QVBoxLayout *loadPanelLayout = new QVBoxLayout(loadPanel);
+    QLabel *loadTitle = new QLabel("选择要读取的存档", loadPanel);
+    loadTitle->setFont(QFont("Microsoft YaHei", 24, QFont::Bold));
+    loadTitle->setStyleSheet("color: white;");
+    loadTitle->setAlignment(Qt::AlignCenter);
+    loadPanelLayout->addWidget(loadTitle);
+
+    QVBoxLayout *slotsLayout = new QVBoxLayout();
+    loadPanelLayout->addLayout(slotsLayout);
+
+    QPushButton *closePanelBtn = new QPushButton("返回主菜单", loadPanel);
+    closePanelBtn->setFixedSize(200, 40);
+    closePanelBtn->setStyleSheet("background-color: #c0392b; color: white; border-radius: 5px; font-weight: bold;");
+    loadPanelLayout->addWidget(closePanelBtn, 0, Qt::AlignCenter);
+
+    // 页面 2：游戏界面
+    QWidget *gamePage = new QWidget();
+    
+    // 必须先定义这些控件！
+    QTextEdit *narratorArea = new QTextEdit(gamePage);
     narratorArea->setGeometry(50, 30, 900, 300); 
     narratorArea->setStyleSheet("background-color: rgba(0, 0, 0, 120); color: #ecf0f1; font-family: 'Microsoft YaHei'; font-size: 16px; border-radius: 10px; padding: 15px; border: none;");
     narratorArea->setReadOnly(true);
 
-    // 3. 对话框（底部居中）
-    QLabel *dialogBox = new QLabel(&window);
+    QLabel *dialogBox = new QLabel(gamePage);
     dialogBox->setGeometry(50, 450, 900, 150);
     dialogBox->setFont(QFont("Microsoft YaHei", 22));
     dialogBox->setStyleSheet("background-color: rgba(0, 0, 0, 200); color: white; border-radius: 15px; padding: 20px; border: 2px solid #34495e;");
     dialogBox->setWordWrap(true);
 
-    // 4. 选项容器（平时隐藏，覆盖在对话上方）
-    QWidget *optionsWidget = new QWidget(&window);
-    optionsWidget->setGeometry(250, 250, 500, 180); // 居中显示
+    QWidget *optionsWidget = new QWidget(gamePage);
+    optionsWidget->setGeometry(250, 250, 500, 180);
     optionsWidget->setStyleSheet("background: transparent;");
     QVBoxLayout *optionsLayout = new QVBoxLayout(optionsWidget);
     optionsLayout->setContentsMargins(0, 0, 0, 0);
-    optionsWidget->hide(); // 默认隐藏
+    optionsWidget->hide();
 
-    // 5. 自由输入区（平时隐藏，底部）
-    QWidget *inputWidget = new QWidget(&window);
+    QWidget *inputWidget = new QWidget(gamePage);
     inputWidget->setGeometry(50, 620, 900, 50);
     QHBoxLayout *inputLayout = new QHBoxLayout(inputWidget);
     inputLayout->setContentsMargins(0, 0, 0, 0);
@@ -86,21 +132,44 @@ int main(int argc, char *argv[]) {
     
     inputLayout->addWidget(inputBox);
     inputLayout->addWidget(sendBtn);
-    inputWidget->hide(); // 默认隐藏
+    inputWidget->hide();
 
-    // ==========================================
-    // 核心逻辑：刷新界面
-    // ==========================================
+    // 👇 现在 narratorArea 已经存在了，可以加系统菜单了
+    QPushButton *sysMenuBtn = new QPushButton("⚙ 菜单", gamePage);
+    sysMenuBtn->setGeometry(850, 20, 100, 40);
+    sysMenuBtn->setStyleSheet(
+        "QPushButton { background-color: rgba(0, 0, 0, 180); color: white; border-radius: 8px; font-weight: bold; border: 1px solid #555; }"
+        "QPushButton:hover { background-color: rgba(52, 152, 219, 220); }"
+    );
+
+    QMenu *systemMenu = new QMenu();
+    QAction *saveAction = systemMenu->addAction("保存进度");
+    QAction *backToMenuAction = systemMenu->addAction("返回主菜单");
+    
+    QObject::connect(sysMenuBtn, &QPushButton::clicked, [&, systemMenu, sysMenuBtn]() {
+        systemMenu->exec(sysMenuBtn->mapToGlobal(QPoint(0, sysMenuBtn->height())));
+    });
+
+    QObject::connect(saveAction, &QAction::triggered, [&]() {
+        engine.applyPenalty(0);
+        QMessageBox::information(&window, "系统", "进度已保存！");
+    });
+
+    QObject::connect(backToMenuAction, &QAction::triggered, [&]() {
+        engine.applyPenalty(0); // 退出前存一次档
+        stackedWidget->setCurrentWidget(mainMenuPage);
+        narratorArea->clear(); // 此时编译器认识 narratorArea 了，不会报错
+    });
+
+    // 刷新界面核心逻辑
     std::function<void()> refreshUI; 
     refreshUI = [&]() {
-        // 1. 清理旧选项
         QLayoutItem *item;
         while ((item = optionsLayout->takeAt(0)) != nullptr) {
             if (item->widget()) item->widget()->deleteLater();
             delete item;
         }
 
-        // 默认隐藏选项和输入框
         optionsWidget->hide();
         inputWidget->hide();
 
@@ -109,35 +178,29 @@ int main(int argc, char *argv[]) {
             return;
         }
 
-        // 2. 获取当前节点数据
         std::vector<std::string> pages = engine.getCurrentNodePages();
         if (pages.empty()) return;
 
-        // 3. 区分旁白和对话
         QString narratorText = QString::fromStdString(pages[0]);
         QString npcText = "";
         
         if (pages.size() >= 2 && narratorText.contains("旁白")) {
-            // 如果是旁白，追加到旁白区
             narratorArea->append(narratorText);
             npcText = QString::fromStdString(pages[1]);
         } else {
-            // 如果没有旁白，pages[0] 就是对话
             npcText = narratorText;
         }
 
         dialogBox->setText(npcText);
 
-        // 4. 动态获取选项，如果有选项，才显示选项框
         std::vector<std::string> currentOpts = engine.getCurrentOptions();
         if (!currentOpts.empty()) {
-            optionsWidget->show(); // 👈 显示选项框
+            optionsWidget->show();
             
             for (size_t i = 0; i < currentOpts.size(); ++i) {
                 QString btnText = QString::fromStdString(currentOpts[i]);
-                QPushButton *btn = new QPushButton(btnText, &window);
+                QPushButton *btn = new QPushButton(btnText, gamePage);
                 
-                // 高级感按钮样式
                 btn->setStyleSheet(
                     "QPushButton { background-color: rgba(30, 30, 30, 200); color: #ecf0f1; padding: 12px 20px; border-radius: 10px; border: 1px solid #7f8c8d; text-align: left; font-family: 'Microsoft YaHei'; font-size: 16px; }"
                     "QPushButton:hover { background-color: rgba(52, 152, 219, 220); border: 1px solid #3498db; }"
@@ -145,12 +208,15 @@ int main(int argc, char *argv[]) {
                 optionsLayout->addWidget(btn);
                 
                 QObject::connect(btn, &QPushButton::clicked, [&, i, btnText]() {
-                    // 如果点击了自由输入（假定第三个选项是自由输入）
                     if (btnText.contains("自由输入") || btnText.contains("3.")) {
-                        inputWidget->show(); // 显示输入框
+                        inputWidget->show();
                         inputBox->setFocus();
+                        for (int j = 0; j < optionsLayout->count(); ++j) {
+                            if (optionsLayout->itemAt(j)->widget()) {
+                                optionsLayout->itemAt(j)->widget()->hide();
+                            }
+                        }
                     } else {
-                        // 普通选项，直接推进剧情
                         engine.processInput(std::to_string(i + 1));
                         refreshUI(); 
                     }
@@ -159,7 +225,82 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    // 发送自由输入的文本
+    // 刷新存档面板
+    std::function<void()> refreshLoadPanel;
+    refreshLoadPanel = [&]() {
+        QLayoutItem *item;
+        while ((item = slotsLayout->takeAt(0)) != nullptr) {
+            if (item->widget()) item->widget()->deleteLater();
+            delete item;
+        }
+
+        std::vector<DatabaseManager::SaveInfo> saves = engine.getAllSaves();
+
+        for (int i = 0; i < 3; ++i) {
+            QWidget *slotWidget = new QWidget();
+            slotWidget->setFixedSize(600, 80);
+            slotWidget->setStyleSheet("background-color: #34495e; border-radius: 8px;");
+
+            if (i < saves.size()) {
+                DatabaseManager::SaveInfo info = saves[i];
+                
+                QPushButton *loadBtn = new QPushButton(slotWidget);
+                loadBtn->setGeometry(0, 0, 600, 80);
+                loadBtn->setStyleSheet("QPushButton { background: transparent; border-radius: 8px; } QPushButton:hover { background-color: #3498db; }");
+                
+                QVBoxLayout *slotLayout = new QVBoxLayout(loadBtn);
+                slotLayout->setContentsMargins(20, 10, 20, 10);
+                slotLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+                QLabel *line1 = new QLabel(QString::fromStdString("玩家: " + info.playerName + "  |  好感度: " + std::to_string(info.affinity)), loadBtn);
+                line1->setStyleSheet("color: white; font-size: 18px; font-weight: bold; background: transparent;");
+                
+                               // 强行把时间读出来，并在终端打印看看
+                std::cout << "【UI DEBUG】准备渲染的时间是: [" << info.lastLogin << "]" << std::endl;
+                
+                QString timeStr = QString::fromStdString(info.lastLogin);
+                if (timeStr.trimmed().isEmpty()) {
+                    timeStr = "时间读取失败"; // 如果C++里是空的，界面上强行显示这句，方便排查
+                }
+
+                QLabel *line2 = new QLabel("最后存档时间: " + timeStr, loadBtn);
+                line2->setStyleSheet("color: #bdc3c7; font-size: 14px; background: transparent;");
+
+                slotLayout->addWidget(line1);
+                slotLayout->addWidget(line2);
+                
+                QObject::connect(loadBtn, &QPushButton::clicked, [&, info]() {
+                    if (engine.loadExistingPlayer(info.playerName)) {
+                        refreshUI();
+                        stackedWidget->setCurrentWidget(gamePage);
+                        loadPanel->hide();
+                    }
+                });
+
+                QPushButton *delBtn = new QPushButton("X", slotWidget);
+                delBtn->setGeometry(560, 5, 30, 30);
+                delBtn->setStyleSheet("QPushButton { background-color: #e74c3c; color: white; border-radius: 15px; font-weight: bold; } QPushButton:hover { background-color: #c0392b; }");
+                
+                QObject::connect(delBtn, &QPushButton::clicked, [&, info]() {
+                    QMessageBox::StandardButton reply = QMessageBox::question(&window, "删除存档", "确定要删除这个存档吗？", QMessageBox::Yes | QMessageBox::No);
+                    if (reply == QMessageBox::Yes) {
+                        engine.deleteSaveData(info.playerName);
+                        refreshLoadPanel(); 
+                    }
+                });
+
+            } else {
+                QLabel *emptyLabel = new QLabel("【空存档位】", slotWidget);
+                emptyLabel->setGeometry(0, 0, 600, 80);
+                emptyLabel->setAlignment(Qt::AlignCenter);
+                emptyLabel->setStyleSheet("color: #7f8c8d; font-size: 16px;");
+            }
+
+            slotsLayout->addWidget(slotWidget, 0, Qt::AlignCenter);
+        }
+    };
+
+    // 发送按钮绑定
     QObject::connect(sendBtn, &QPushButton::clicked, [&]() {
         QString text = inputBox->text();
         if (text.isEmpty()) return;
@@ -173,18 +314,41 @@ int main(int argc, char *argv[]) {
             return;
         }
 
-        // 把玩家说的话也当做旁白记录一下
         narratorArea->append("\033[34m> " + text + "\033[0m");
-        
         engine.processInput(text.toStdString());
         inputBox->clear();
-        inputWidget->hide(); // 发送完隐藏输入框
+        inputWidget->hide();
         refreshUI(); 
     });
 
-    // 初始刷新界面
-    refreshUI();
+    // 页面与按钮绑定
+    stackedWidget->addWidget(mainMenuPage);
+    stackedWidget->addWidget(gamePage);
+    stackedWidget->setCurrentWidget(mainMenuPage);
+
+    QObject::connect(startBtn, &QPushButton::clicked, [&]() {
+        bool ok;
+        QString name = QInputDialog::getText(&window, "新游戏", "请输入你的名字:", QLineEdit::Normal, "", &ok);
+        if (!ok || name.isEmpty()) return;
+        
+        engine.createNewPlayer(name.toStdString());
+        refreshUI(); 
+        stackedWidget->setCurrentWidget(gamePage); 
+    });
+
+    QObject::connect(openLoadPanelBtn, &QPushButton::clicked, [&]() {
+        refreshLoadPanel(); 
+        loadPanel->show();  
+    });
+
+    QObject::connect(closePanelBtn, &QPushButton::clicked, [&]() {
+        loadPanel->hide(); 
+    });
+
+    QObject::connect(quitBtn, &QPushButton::clicked, [&]() {
+        window.close();
+    });
+
     window.show();
-    
     return app.exec();
 }

@@ -1,1 +1,0 @@
-/usr/bin/c++ -g CMakeFiles/galgame.dir/galgame_autogen/mocs_compilation.cpp.o CMakeFiles/galgame.dir/src/main.cpp.o -o galgame  -lsqlite3 

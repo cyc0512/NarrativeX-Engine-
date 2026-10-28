@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -rdynamic CMakeFiles/x11_client.dir/src/x11_main.cpp.o -o x11_client  -lX11 -lsqlite3 

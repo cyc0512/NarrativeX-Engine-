@@ -1,3 +1,0 @@
-# Hashes of file build rules.
-4e70b72b61e160d9600c5462eb0b185b CMakeFiles/galgame_autogen
-8dcbc9249b2f4c267cc6475042a26c80 CMakeFiles/qt_client_autogen
