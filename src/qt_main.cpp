@@ -15,6 +15,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QPoint>
+#include <QTimer>
 #include <functional>
 #include <vector>
 #include <string>
@@ -107,7 +108,6 @@ int main(int argc, char *argv[]) {
     // ==========================================
     QWidget *gamePage = new QWidget();
     
-    // 统一下方对话框
     QLabel *dialogBox = new QLabel(gamePage);
     dialogBox->setGeometry(50, 250, 900, 350); 
     dialogBox->setFont(QFont("Microsoft YaHei", 20)); 
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     dialogBox->setAlignment(Qt::AlignTop | Qt::AlignLeft); 
 
     QWidget *optionsWidget = new QWidget(gamePage);
-    optionsWidget->setGeometry(250, 450, 500, 180); // 选项框移到下方
+    optionsWidget->setGeometry(250, 450, 500, 180); 
     optionsWidget->setStyleSheet("background: transparent;");
     QVBoxLayout *optionsLayout = new QVBoxLayout(optionsWidget);
     optionsLayout->setContentsMargins(0, 0, 0, 0);
@@ -138,7 +138,6 @@ int main(int argc, char *argv[]) {
     inputLayout->addWidget(sendBtn);
     inputWidget->hide();
 
-    // 系统菜单
     QPushButton *sysMenuBtn = new QPushButton("⚙ 菜单", gamePage);
     sysMenuBtn->setGeometry(850, 20, 100, 40);
     sysMenuBtn->setStyleSheet(
@@ -169,7 +168,6 @@ int main(int argc, char *argv[]) {
     // ==========================================
     std::function<void()> refreshUI; 
     refreshUI = [&]() {
-        // 清理旧选项
         QLayoutItem *item;
         while ((item = optionsLayout->takeAt(0)) != nullptr) {
             if (item->widget()) item->widget()->deleteLater();
@@ -184,16 +182,15 @@ int main(int argc, char *argv[]) {
             return;
         }
 
-        // 获取整段文本
         std::vector<std::string> pages = engine.getCurrentNodePages();
         if (pages.empty()) return;
         dialogBox->setText(QString::fromStdString(pages[0])); 
 
-        // 获取选项
         std::vector<std::string> currentOpts = engine.getCurrentOptions();
+        bool hasIntent = engine.hasIntentNodes(); // 引擎提供的全新判断接口
         
-        if (currentOpts.empty()) {
-            // 👇 核心修复：没有选项时，显示“点击继续”按钮推进纯文本剧情
+        if (currentOpts.empty() && !hasIntent) {
+            // 纯文本节点，没有任何操作，显示继续
             optionsWidget->show();
             QPushButton *continueBtn = new QPushButton("点击继续...", gamePage);
             continueBtn->setStyleSheet(
@@ -203,12 +200,13 @@ int main(int argc, char *argv[]) {
             optionsLayout->addWidget(continueBtn);
             
             QObject::connect(continueBtn, &QPushButton::clicked, [&]() {
-                engine.processInput(" "); // 传个空格，触发 default_next
+                engine.processInput(" "); 
                 refreshUI();
             });
         } else {
             optionsWidget->show();
             
+            // 1. 渲染 JSON 里的固定选项
             for (size_t i = 0; i < currentOpts.size(); ++i) {
                 QString btnText = QString::fromStdString(currentOpts[i]);
                 QPushButton *btn = new QPushButton(btnText, gamePage);
@@ -223,7 +221,6 @@ int main(int argc, char *argv[]) {
                     if (btnText.contains("自由输入") || btnText.contains("3.")) {
                         inputWidget->show();
                         inputBox->setFocus();
-                        // 隐藏其他按钮
                         for (int j = 0; j < optionsLayout->count(); ++j) {
                             if (optionsLayout->itemAt(j)->widget()) {
                                 optionsLayout->itemAt(j)->widget()->hide();
@@ -235,10 +232,32 @@ int main(int argc, char *argv[]) {
                     }
                 });
             }
+
+            // 2. 强制生成自由输入按钮（如果该节点有隐藏 AI 分支）
+            if (hasIntent) {
+                QPushButton *btn = new QPushButton("【自由输入】对她说点什么...", gamePage);
+                btn->setStyleSheet(
+                    "QPushButton { background-color: rgba(230, 126, 34, 200); color: white; padding: 12px 20px; border-radius: 10px; border: 1px solid #e67e22; text-align: left; font-family: 'Microsoft YaHei'; font-size: 16px; font-weight: bold; }"
+                    "QPushButton:hover { background-color: rgba(211, 84, 0, 255); }"
+                );
+                optionsLayout->addWidget(btn);
+
+                QObject::connect(btn, &QPushButton::clicked, [&]() {
+                    inputWidget->show();
+                    inputBox->setFocus();
+                    for (int j = 0; j < optionsLayout->count(); ++j) {
+                        if (optionsLayout->itemAt(j)->widget()) {
+                            optionsLayout->itemAt(j)->widget()->hide();
+                        }
+                    }
+                });
+            }
         }
     };
 
+    // ==========================================
     // 刷新存档面板
+    // ==========================================
     std::function<void()> refreshLoadPanel;
     refreshLoadPanel = [&]() {
         QLayoutItem *item;
@@ -309,14 +328,14 @@ int main(int argc, char *argv[]) {
     };
 
     // ==========================================
-    // 发送按钮及多线程逻辑
+    // 发送按钮及多线程逻辑 (原生安全版)
     // ==========================================
     QObject::connect(sendBtn, &QPushButton::clicked, [&]() {
         QString text = inputBox->text();
         if (text.isEmpty()) return;
         
         if (security.checkSecurity(text.toStdString())) {
-            QMessageBox::warning(&window, "警告", "检测到不文明用语，好感度扣除！");
+            QMessageBox::warning(&window, "警告", "检测到不文明用语！");
             engine.applyPenalty(-20);
             inputBox->clear();
             inputWidget->hide();
@@ -327,31 +346,48 @@ int main(int argc, char *argv[]) {
         inputBox->clear();
         inputWidget->hide();
         
-        dialogBox->setText("木因子正在思考中......");
+        dialogBox->setText("木子因正在思考中......");
         sendBtn->setDisabled(true);
 
-        QFuture<std::string> future = QtConcurrent::run([&, text]() {
-            std::string reply = engine.processInput(text.toStdString());
-            return reply;
-        });
+        std::string nodeBeforeSend = engine.getCurrentNode();
 
-        QFutureWatcher<std::string> *watcher = new QFutureWatcher<std::string>(&window);
+        // 开启异步任务，通过 QFutureWatcher 监听结果
+        QFutureWatcher<std::string>* watcher = new QFutureWatcher<std::string>(&window);
         
-        QObject::connect(watcher, &QFutureWatcher<std::string>::finished, [&, watcher]() {
-            std::string fullReply = watcher->result();
+        QObject::connect(watcher, &QFutureWatcher<std::string>::finished, [&, watcher, nodeBeforeSend]() {
             std::string aiText = engine.getLastAiReply();
-            
-            if (aiText.empty()) aiText = fullReply;
+            if (aiText.empty()) aiText = "（木子因似乎陷入了沉默）";
 
             dialogBox->setText(QString::fromStdString(aiText));
-
             sendBtn->setDisabled(false);
-            watcher->deleteLater(); 
-            
-            // 刷新界面
-            refreshUI(); 
+
+            std::string nodeAfterSend = engine.getCurrentNode();
+            if (nodeBeforeSend != nodeAfterSend) {
+                refreshUI();
+            } else {
+                inputWidget->show();
+                inputBox->setFocus();
+            }
+
+            watcher->deleteLater();
         });
-        
+
+        // 5 秒超时保护
+        QTimer::singleShot(5000, [&, watcher]() {
+            if (watcher && watcher->isFinished() == false) {
+                sendBtn->setDisabled(false);
+                dialogBox->setText("（木子因似乎陷入了长久的沉默，没有回应。）");
+                inputWidget->show();
+                inputBox->setFocus();
+                watcher->disconnect();
+                watcher->deleteLater();
+            }
+        });
+
+        // 启动后台线程执行 engine.processInput
+        QFuture<std::string> future = QtConcurrent::run([&, text]() {
+            return engine.processInput(text.toStdString());
+        });
         watcher->setFuture(future);
     });
 
@@ -369,8 +405,6 @@ int main(int argc, char *argv[]) {
         
         engine.createNewPlayer(name.toStdString());
         stackedWidget->setCurrentWidget(gamePage);
-        
-        // 👇 核心修复：新游戏必须立刻刷新界面显示第一句话！
         refreshUI(); 
     });
 

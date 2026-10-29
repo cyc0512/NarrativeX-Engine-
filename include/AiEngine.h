@@ -116,31 +116,44 @@ public:
             }
 
             std::string content = response["choices"][0]["message"]["content"];
-            
+            std::cout << "【AI原始文本】 " << content << std::endl;
+
             // 6. 提取并清洗 JSON
             size_t start = content.find("{");
             size_t end = content.rfind("}");
             
             if (start != std::string::npos && end != std::string::npos) {
                 std::string json_str = content.substr(start, end - start + 1);
+                
+                // 暴力清洗，只保留 ASCII 字符（去中文标点、去 markdown 符号）
                 std::string clean_str;
                 for (char c : json_str) {
                     if (c >= 32 && c <= 126) clean_str += c;
                 }
                 
                 try {
-                    return json::parse(clean_str); 
+                    json result = json::parse(clean_str);
+                    
+                    // 核心修复：确保 JSON 解析成功后，真的包含了 reply 字段！
+                    if (result.contains("reply") && result["reply"].is_string()) {
+                        return result; // 完美返回
+                    } else {
+                        std::cerr << "【AI解析警告】JSON没有reply字段！" << std::endl;
+                        return {{"affinity_change", 0}, {"next_node", ""}, {"reply", "（木子因似乎不知道该说什么。）"}};
+                    }
                 } catch (const std::exception& e) {
-                    return {{"affinity_change", 0}, {"next_node", ""}, {"reply", content}};
+                    std::cerr << "【AI解析失败】" << e.what() << "\n清洗后: [" << clean_str << "]" << std::endl;
+                    // 如果彻底解析失败，不要把带乱码的 content 丢给玩家，给一个兜底
+                    return {{"affinity_change", 0}, {"next_node", ""}, {"reply", "（木子因走神了，没有听清你的话。）"}};
                 }
             } else {
+                // 如果连花括号都没有，说明 AI 回了纯文本
                 return {{"affinity_change", 0}, {"next_node", ""}, {"reply", content}}; 
             }
-            
         } catch (const std::exception& e) {
-            return {{"affinity_change", 0}, {"next_node", ""}, {"reply", "（系统故障）"}};
+            return {{"affinity_change", 0}, {"next_node", ""}, {"reply", "（系统异常）"}};
         } catch (...) {
             return {{"affinity_change", 0}, {"next_node", ""}, {"reply", "（未知故障）"}};
         }
-    }
+    } 
 }; 

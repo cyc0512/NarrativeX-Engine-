@@ -30,9 +30,18 @@ public:
 
     ~GameEngine() { delete db; }
 
+    std::string getCurrentNode() const { return currentNode; }
+
+    // 👇 新增：给 UI 层判断当前节点是否支持 AI 隐藏分支
+    bool hasIntentNodes() const {
+        if (currentNode == "-1") return false;
+        json node = storyData["nodes"][currentNode];
+        return node.contains("intent_nodes") && !node["intent_nodes"].empty();
+    }
+
     void createNewPlayer(const std::string& name) {
         playerName = name;
-        affinity = 90; // 初始好感度90
+        affinity = 90; 
         currentNode = "0";
         db->saveData(playerName, affinity, currentNode);
     }
@@ -58,15 +67,12 @@ public:
         json node = storyData["nodes"][currentNode];
         
         std::string fullText = "";
-        
         if (node.contains("narrator") && node["narrator"].is_string()) {
             fullText += node["narrator"].get<std::string>() + "\n\n";
         }
-        
         if (node.contains("npc_text") && node["npc_text"].is_string()) {
             fullText += node["npc_text"].get<std::string>() + "\n";
         }
-        
         pages.push_back(fullText);
         return pages;
     }
@@ -94,7 +100,6 @@ public:
         
         json current_node_data = storyData["nodes"][currentNode];
         
-        // 安全获取默认节点
         std::string nextNode = currentNode;
         if (current_node_data.contains("default_next") && current_node_data["default_next"].is_string()) {
             nextNode = current_node_data["default_next"].get<std::string>();
@@ -102,7 +107,6 @@ public:
         
         bool isOptionSelected = false;
 
-        // 1. 固定选项拦截
         if (current_node_data.contains("options") && current_node_data["options"].is_array() && !current_node_data["options"].empty()) {
             try {
                 int choice = std::stoi(processedInput); 
@@ -119,7 +123,6 @@ public:
             } catch (...) {} 
         }
 
-        // 2. 自由输入 / AI 介入
         if (isOptionSelected) {
             reply = "你做出了选择。"; 
         } else {
@@ -128,22 +131,29 @@ public:
                 npcState = current_node_data["npc_state"].get<std::string>();
             }
 
-            // 👇 完美兼容 intent_nodes 和 dynamic_routes
             std::string routesDesc = "无特殊路径";
             if (current_node_data.contains("intent_nodes") && current_node_data["intent_nodes"].is_object()) {
                 routesDesc = "";
                 for (auto& [node_id, node_data] : current_node_data["intent_nodes"].items()) {
+                    
+                    if (node_data.contains("required_item")) {
+                        std::string reqItem = node_data["required_item"].get<std::string>();
+                        bool hasItem = false;
+                        std::vector<std::string> items = db->getItems(playerName);
+                        for (const auto& item : items) {
+                            if (item == reqItem) { hasItem = true; break; }
+                        }
+                        if (!hasItem) {
+                            std::cout << "【引擎拦截】缺少道具[" << reqItem << "]，屏蔽分支: " << node_id << std::endl;
+                            continue; 
+                        }
+                    }
+
                     std::string desc = "无描述";
                     if (node_data.contains("description") && node_data["description"].is_string()) {
                         desc = node_data["description"].get<std::string>();
                     }
                     routesDesc += "【路径节点ID】: " + node_id + "\n【语义描述】: " + desc + "\n\n";
-                }
-            } else if (current_node_data.contains("dynamic_routes") && current_node_data["dynamic_routes"].is_array()) {
-                routesDesc = "";
-                for (const auto& route : current_node_data["dynamic_routes"]) {
-                    routesDesc += "- 描述：" + route["description"].get<std::string>() + 
-                                  " | 跳转节点：" + route["next_node"].get<std::string>() + "\n";
                 }
             }
 
@@ -162,25 +172,36 @@ public:
                 affinityChange = aiResult["affinity_change"].get<int>();
             }
             affinity += affinityChange;
-            reply += "\n【好感度 " + std::to_string(affinityChange) + "，当前好感: " + std::to_string(affinity) + "】\n";
             
-            // 👇 核心：处理节点映射与跳转
+            if (affinityChange != 0) {
+                std::cout << "【后台数值变动】好感度: " << affinityChange << "，当前: " << affinity << std::endl;
+            }
+            
             if (aiResult.contains("next_node") && !aiResult["next_node"].is_null() && aiResult["next_node"].is_string()) {
                 std::string aiNextNode = aiResult["next_node"].get<std::string>();
                 if (!aiNextNode.empty()) {
-                    // 检查有没有配置语义映射（比如把"黑化类结局"翻译成"danger_end"）
-                    if (current_node_data.contains("event_mapping") && current_node_data["event_mapping"].contains(aiNextNode)) {
-                        nextNode = current_node_data["event_mapping"][aiNextNode].get<std::string>();
-                        std::cout << "【系统】语义标签[" << aiNextNode << "] 映射为节点: " << nextNode << std::endl;
-                    } else {
-                        nextNode = aiNextNode;
-                        std::cout << "【系统】AI 判定跳转至节点: " << nextNode << "\n";
+                    
+                    if (current_node_data.contains("intent_nodes") && 
+                        current_node_data["intent_nodes"].contains(aiNextNode) &&
+                        current_node_data["intent_nodes"][aiNextNode].contains("reward_item")) {
+                        
+                        std::string reward = current_node_data["intent_nodes"][aiNextNode]["reward_item"].get<std::string>();
+                        std::cout << "【系统奖励】玩家获得道具: " << reward << "，已存入数据库！" << std::endl;
+                        db->addItem(playerName, reward);
                     }
+                    
+                    nextNode = aiNextNode;
+                    std::cout << "【系统】AI 判定跳转至节点: " << nextNode << "\n";
                 } else {
                     nextNode = currentNode;
                 }
             } else {
                 nextNode = currentNode; 
+            }
+            
+            if (!storyData["nodes"].contains(nextNode) && nextNode != "-1") {
+                std::cout << "【系统警告】AI 试图跳转到不存在的节点[" << nextNode << "]，强制返回原节点。\n";
+                nextNode = currentNode;
             }
         }
 
@@ -192,20 +213,8 @@ public:
 
     bool isGameOver() { return currentNode == "-1"; }
 
-    std::vector<DatabaseManager::SaveInfo> getAllSaves() {
-        return db->getAllSaves();
-    }
-    
-    std::string getLastAiReply() {
-        return lastAiReply;
-    }
-
-    void deleteSaveData(const std::string& name) {
-        db->deleteSave(name);
-    }
-
-    void applyPenalty(int penalty) {
-        affinity += penalty;
-        if (db && !playerName.empty()) db->saveData(playerName, affinity, currentNode);
-    }
+    std::vector<DatabaseManager::SaveInfo> getAllSaves() { return db->getAllSaves(); }
+    std::string getLastAiReply() { return lastAiReply; }
+    void deleteSaveData(const std::string& name) { db->deleteSave(name); }
+    void applyPenalty(int penalty) { affinity += penalty; if (db && !playerName.empty()) db->saveData(playerName, affinity, currentNode); }
 };
