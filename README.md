@@ -2,6 +2,10 @@
 
 **NarrativeX** 是一款基于 C++17 与 Qt5 开发的开源文字冒险引擎，旨在为全新的游戏品类 **FluidStory (流态故事)** 提供底层技术支持。
 
+> ⚠️ **【版权与原创声明】**
+> **FluidStory (流态故事)** 这一游戏品类概念，以及 **NarrativeX Engine** 的底层架构（包括但不限于：动态状态注入机制、大模型意图分发与主线收束机制），均由本项目作者独立提出并首次实现。
+> 本仓库代码基于开源协议发布，欢迎学习与交流。但严禁直接将他人的原创概念与架构思想据为己有进行商业宣传。
+
 ### 💡 缘起
 目前市面上的文字游戏（Galgame/Visual Novel）大多停留在“静态分支树”时代；即便引入了 AI，AI 也往往只是一个与主线割裂的“陪聊挂件”。
 
@@ -27,10 +31,11 @@
 使用 **NarrativeX** 开发游戏，你不需要修改任何一行 C++ 代码。所有的剧情走向、人设与分支，都由 `data/` 目录下的两个 JSON 文件驱动。
 
 ### 1. 配置 AI 人设与行为约束 (`data/prompts.json`)
+
 为了让大模型在扮演 NPC 时不会“出戏”或“暴走”，你需要在这里定义 `system_prompt`。
-*   必须包含 `{NPC_STATE}`：引擎会自动注入当前节点的剧情状态。
-*   必须包含 `{AFFINITY}`：引擎会自动注入玩家当前的好感度。
-*   必须包含 `{DYNAMIC_ROUTES}`：引擎会自动注入当前节点允许跳转的隐藏分支路径。
+* 必须包含 `{NPC_STATE}`：引擎会自动注入当前节点的剧情状态。
+* 必须包含 `{AFFINITY}`：引擎会自动注入玩家当前的好感度。
+* 必须包含 `{DYNAMIC_ROUTES}`：引擎会自动注入当前节点允许跳转的隐藏分支路径。
 
 **示例：**
 ```json
@@ -39,11 +44,10 @@
         "system_prompt": "你扮演高中生木子因，对主角有极端依赖。\n当前状态：{NPC_STATE}\n当前好感度：{AFFINITY}\n可选分支：\n{DYNAMIC_ROUTES}\n请严格返回 JSON 格式：{\"affinity_change\": 数值, \"next_node\": \"节点ID\", \"reply\": \"回复内容\"}"
     }
 }
-
+```
 ## 🚀 快速开始 (Quick Start)
+
+### 环境依赖
 ```bash
 sudo apt install qtbase5-dev libqt5concurrent5 libsqlite3-dev libcurl4-openssl-dev
-mkdir build && cd build
-cmake ..
-make
-./fluidstory
+```
