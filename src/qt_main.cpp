@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     SecurityFilter security;
 
     QWidget window;
-    window.setWindowTitle("ISOLATE - 文字冒险游戏");
+    window.setWindowTitle("FluidStory - Powered by NarrativeX");
     window.resize(1000, 700); 
     window.setStyleSheet("background-color: #1a1a1a;");
 
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     QVBoxLayout *mainMenuLayout = new QVBoxLayout(mainMenuPage);
     mainMenuLayout->setAlignment(Qt::AlignCenter);
 
-    QLabel *titleLabel = new QLabel("ISOLATE", mainMenuPage);
+    QLabel *titleLabel = new QLabel("FluidStory", mainMenuPage);
     titleLabel->setFont(QFont("Microsoft YaHei", 60, QFont::Bold));
     titleLabel->setStyleSheet("color: white; margin-bottom: 40px;");
     titleLabel->setAlignment(Qt::AlignCenter);
