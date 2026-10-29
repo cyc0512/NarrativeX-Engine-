@@ -22,6 +22,7 @@
 #include "SecurityFilter.h"
 #include <QtConcurrent>
 #include <QFutureWatcher>
+
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
@@ -50,7 +51,9 @@ int main(int argc, char *argv[]) {
     stackedWidget->setGeometry(0, 0, 1000, 700);
     stackedWidget->setStyleSheet("background: transparent;");
 
+    // ==========================================
     // 页面 1：主菜单
+    // ==========================================
     QWidget *mainMenuPage = new QWidget();
     QVBoxLayout *mainMenuLayout = new QVBoxLayout(mainMenuPage);
     mainMenuLayout->setAlignment(Qt::AlignCenter);
@@ -76,7 +79,9 @@ int main(int argc, char *argv[]) {
     quitBtn->setStyleSheet(startBtn->styleSheet());
     mainMenuLayout->addWidget(quitBtn, 0, Qt::AlignCenter);
 
+    // ==========================================
     // 存档面板
+    // ==========================================
     QWidget *loadPanel = new QWidget(&window);
     loadPanel->setGeometry(150, 100, 700, 500);
     loadPanel->setStyleSheet("background-color: rgba(20, 20, 20, 240); border-radius: 15px; border: 2px solid #7f8c8d;");
@@ -97,23 +102,21 @@ int main(int argc, char *argv[]) {
     closePanelBtn->setStyleSheet("background-color: #c0392b; color: white; border-radius: 5px; font-weight: bold;");
     loadPanelLayout->addWidget(closePanelBtn, 0, Qt::AlignCenter);
 
+    // ==========================================
     // 页面 2：游戏界面
+    // ==========================================
     QWidget *gamePage = new QWidget();
     
-    // 必须先定义这些控件！
-    QTextEdit *narratorArea = new QTextEdit(gamePage);
-    narratorArea->setGeometry(50, 30, 900, 300); 
-    narratorArea->setStyleSheet("background-color: rgba(0, 0, 0, 120); color: #ecf0f1; font-family: 'Microsoft YaHei'; font-size: 16px; border-radius: 10px; padding: 15px; border: none;");
-    narratorArea->setReadOnly(true);
-
+    // 统一下方对话框
     QLabel *dialogBox = new QLabel(gamePage);
-    dialogBox->setGeometry(50, 450, 900, 150);
-    dialogBox->setFont(QFont("Microsoft YaHei", 22));
-    dialogBox->setStyleSheet("background-color: rgba(0, 0, 0, 200); color: white; border-radius: 15px; padding: 20px; border: 2px solid #34495e;");
+    dialogBox->setGeometry(50, 250, 900, 350); 
+    dialogBox->setFont(QFont("Microsoft YaHei", 20)); 
+    dialogBox->setStyleSheet("background-color: rgba(0, 0, 0, 180); color: white; border-radius: 15px; padding: 30px; border: 2px solid #34495e;");
     dialogBox->setWordWrap(true);
+    dialogBox->setAlignment(Qt::AlignTop | Qt::AlignLeft); 
 
     QWidget *optionsWidget = new QWidget(gamePage);
-    optionsWidget->setGeometry(250, 250, 500, 180);
+    optionsWidget->setGeometry(250, 450, 500, 180); // 选项框移到下方
     optionsWidget->setStyleSheet("background: transparent;");
     QVBoxLayout *optionsLayout = new QVBoxLayout(optionsWidget);
     optionsLayout->setContentsMargins(0, 0, 0, 0);
@@ -135,7 +138,7 @@ int main(int argc, char *argv[]) {
     inputLayout->addWidget(sendBtn);
     inputWidget->hide();
 
-    // 👇 现在 narratorArea 已经存在了，可以加系统菜单了
+    // 系统菜单
     QPushButton *sysMenuBtn = new QPushButton("⚙ 菜单", gamePage);
     sysMenuBtn->setGeometry(850, 20, 100, 40);
     sysMenuBtn->setStyleSheet(
@@ -157,14 +160,16 @@ int main(int argc, char *argv[]) {
     });
 
     QObject::connect(backToMenuAction, &QAction::triggered, [&]() {
-        engine.applyPenalty(0); // 退出前存一次档
+        engine.applyPenalty(0); 
         stackedWidget->setCurrentWidget(mainMenuPage);
-        narratorArea->clear(); // 此时编译器认识 narratorArea 了，不会报错
     });
 
-    // 刷新界面核心逻辑
+    // ==========================================
+    // 核心逻辑：刷新界面
+    // ==========================================
     std::function<void()> refreshUI; 
     refreshUI = [&]() {
+        // 清理旧选项
         QLayoutItem *item;
         while ((item = optionsLayout->takeAt(0)) != nullptr) {
             if (item->widget()) item->widget()->deleteLater();
@@ -179,23 +184,29 @@ int main(int argc, char *argv[]) {
             return;
         }
 
+        // 获取整段文本
         std::vector<std::string> pages = engine.getCurrentNodePages();
         if (pages.empty()) return;
+        dialogBox->setText(QString::fromStdString(pages[0])); 
 
-        QString narratorText = QString::fromStdString(pages[0]);
-        QString npcText = "";
-        
-        if (pages.size() >= 2 && narratorText.contains("旁白")) {
-            narratorArea->append(narratorText);
-            npcText = QString::fromStdString(pages[1]);
-        } else {
-            npcText = narratorText;
-        }
-
-        dialogBox->setText(npcText);
-
+        // 获取选项
         std::vector<std::string> currentOpts = engine.getCurrentOptions();
-        if (!currentOpts.empty()) {
+        
+        if (currentOpts.empty()) {
+            // 👇 核心修复：没有选项时，显示“点击继续”按钮推进纯文本剧情
+            optionsWidget->show();
+            QPushButton *continueBtn = new QPushButton("点击继续...", gamePage);
+            continueBtn->setStyleSheet(
+                "QPushButton { background-color: rgba(52, 152, 219, 220); color: white; padding: 12px 20px; border-radius: 10px; font-size: 16px; font-weight: bold; }"
+                "QPushButton:hover { background-color: rgba(41, 128, 185, 255); }"
+            );
+            optionsLayout->addWidget(continueBtn);
+            
+            QObject::connect(continueBtn, &QPushButton::clicked, [&]() {
+                engine.processInput(" "); // 传个空格，触发 default_next
+                refreshUI();
+            });
+        } else {
             optionsWidget->show();
             
             for (size_t i = 0; i < currentOpts.size(); ++i) {
@@ -212,6 +223,7 @@ int main(int argc, char *argv[]) {
                     if (btnText.contains("自由输入") || btnText.contains("3.")) {
                         inputWidget->show();
                         inputBox->setFocus();
+                        // 隐藏其他按钮
                         for (int j = 0; j < optionsLayout->count(); ++j) {
                             if (optionsLayout->itemAt(j)->widget()) {
                                 optionsLayout->itemAt(j)->widget()->hide();
@@ -256,13 +268,8 @@ int main(int argc, char *argv[]) {
                 QLabel *line1 = new QLabel(QString::fromStdString("玩家: " + info.playerName + "  |  好感度: " + std::to_string(info.affinity)), loadBtn);
                 line1->setStyleSheet("color: white; font-size: 18px; font-weight: bold; background: transparent;");
                 
-                               // 强行把时间读出来，并在终端打印看看
-                std::cout << "【UI DEBUG】准备渲染的时间是: [" << info.lastLogin << "]" << std::endl;
-                
                 QString timeStr = QString::fromStdString(info.lastLogin);
-                if (timeStr.trimmed().isEmpty()) {
-                    timeStr = "时间读取失败"; // 如果C++里是空的，界面上强行显示这句，方便排查
-                }
+                if (timeStr.trimmed().isEmpty()) timeStr = "时间读取失败";
 
                 QLabel *line2 = new QLabel("最后存档时间: " + timeStr, loadBtn);
                 line2->setStyleSheet("color: #bdc3c7; font-size: 14px; background: transparent;");
@@ -301,11 +308,13 @@ int main(int argc, char *argv[]) {
         }
     };
 
+    // ==========================================
+    // 发送按钮及多线程逻辑
+    // ==========================================
     QObject::connect(sendBtn, &QPushButton::clicked, [&]() {
         QString text = inputBox->text();
         if (text.isEmpty()) return;
         
-        // 安检拦截
         if (security.checkSecurity(text.toStdString())) {
             QMessageBox::warning(&window, "警告", "检测到不文明用语，好感度扣除！");
             engine.applyPenalty(-20);
@@ -314,50 +323,41 @@ int main(int argc, char *argv[]) {
             refreshUI(); 
             return;
         }
-
-        // 记录玩家发言
-        narratorArea->append("\033[34m> " + text + "\033[0m");
         
         inputBox->clear();
         inputWidget->hide();
         
-        // 锁定界面，显示正在思考
         dialogBox->setText("木因子正在思考中......");
         sendBtn->setDisabled(true);
 
-        // 启动后台线程发送网络请求
         QFuture<std::string> future = QtConcurrent::run([&, text]() {
             std::string reply = engine.processInput(text.toStdString());
             return reply;
         });
 
-        // 监控任务完成
         QFutureWatcher<std::string> *watcher = new QFutureWatcher<std::string>(&window);
         
         QObject::connect(watcher, &QFutureWatcher<std::string>::finished, [&, watcher]() {
             std::string fullReply = watcher->result();
             std::string aiText = engine.getLastAiReply();
             
-            if (aiText.empty()) {
-                aiText = fullReply;
-            }
+            if (aiText.empty()) aiText = fullReply;
 
-            // 直接把 AI 的话显示在大黑框里！
             dialogBox->setText(QString::fromStdString(aiText));
-            
-            // 在旁白区域记录一下好感度变化
-            narratorArea->append("【木因子】" + QString::fromStdString(aiText));
-            narratorArea->append(QString::fromStdString(fullReply));
 
             sendBtn->setDisabled(false);
             watcher->deleteLater(); 
             
-            // 注意：这里绝对不要调用 refreshUI()，否则 AI 的台词会被剧本原有台词覆盖！
+            // 刷新界面
+            refreshUI(); 
         });
         
         watcher->setFuture(future);
     });
-    // 页面与按钮绑定
+
+    // ==========================================
+    // 页面与主菜单绑定
+    // ==========================================
     stackedWidget->addWidget(mainMenuPage);
     stackedWidget->addWidget(gamePage);
     stackedWidget->setCurrentWidget(mainMenuPage);
@@ -368,8 +368,10 @@ int main(int argc, char *argv[]) {
         if (!ok || name.isEmpty()) return;
         
         engine.createNewPlayer(name.toStdString());
+        stackedWidget->setCurrentWidget(gamePage);
+        
+        // 👇 核心修复：新游戏必须立刻刷新界面显示第一句话！
         refreshUI(); 
-        stackedWidget->setCurrentWidget(gamePage); 
     });
 
     QObject::connect(openLoadPanelBtn, &QPushButton::clicked, [&]() {
