@@ -1,0 +1,30 @@
+{
+  // IntelliSense 配置：决定「跳转定义」「自动补全」「红色波浪线」是否准确。
+  // 首选 compileCommands（由 CMake 生成，最准）；找不到时回退到手写 includePath。
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Ubuntu-Linux",
+      "compilerPath": "/usr/bin/g++",
+      "compilerArgs": ["-std=c++17"],
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/engine/include",
+        "${workspaceFolder}/persistence/include",
+        // Ubuntu 多架构路径 —— Qt 与 curl 的头文件实际在这里，
+        // 不在 /usr/include/ 下，漏掉就会满屏红色波浪线
+        "/usr/include/x86_64-linux-gnu/qt5",
+        "/usr/include/x86_64-linux-gnu/qt5/QtCore",
+        "/usr/include/x86_64-linux-gnu/qt5/QtWidgets",
+        "/usr/include/x86_64-linux-gnu/qt5/QtConcurrent",
+        "/usr/include/x86_64-linux-gnu/qt5/QtGui",
+        "/usr/include/x86_64-linux-gnu/curl"
+      ],
+      "defines": []
+    }
+  ]
+}

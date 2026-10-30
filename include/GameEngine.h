@@ -16,19 +16,66 @@ private:
     std::string currentNode;   
     int affinity = 0;          
     std::string playerName;    
-    DatabaseManager* db;
-    std::string lastAiReply;       
+    DatabaseManager* db = nullptr;   // ⚠ 必须初始化，否则构造失败时是野指针
+    std::string lastAiReply;
+    bool ready_ = false;
+    std::string load_error_;
 
-public:
-    GameEngine(const std::string& jsonPath) {
-        std::ifstream file(jsonPath);
-        if (!file.is_open()) return;
-        file >> storyData;
-        currentNode = "0"; 
-        db = new DatabaseManager("../data/save.db"); 
+    // 数据文件定位：兼容"从 build/ 跑"和"从项目根跑"两种习惯。
+    //
+    // 原来所有路径都硬编码成 "../data/story.json"，只有在工作目录恰好是 build/
+    // 时才成立。一旦从别处启动，std::ifstream 打开失败，构造函数会**静默 return**，
+    // db 变成野指针，随后 createNewPlayer() 解引用 -> Ubuntu 上实测直接 SIGSEGV
+    // （ASan 报告：member call on null pointer of type 'DatabaseManager'）。
+    static bool file_readable(const std::string& p) {
+        std::ifstream f(p);
+        return f.good();
+    }
+    static std::string strip_dotdot(const std::string& p) {
+        const std::string prefix = "../";
+        std::string r = p;
+        while (r.compare(0, prefix.size(), prefix) == 0) r = r.substr(prefix.size());
+        return r;
+    }
+    static std::string resolve_data_path(const std::string& rel) {
+        std::vector<std::string> cands;
+        cands.push_back(rel);
+        const std::string flat = strip_dotdot(rel);
+        if (flat != rel) cands.push_back(flat);
+        cands.push_back("../" + flat);
+        cands.push_back("./" + flat);
+        for (const auto& c : cands) if (file_readable(c)) return c;
+        return rel;   // 都找不到就返回原样，让上层拿到可诊断的错误
     }
 
-    ~GameEngine() { delete db; }
+public:
+    // 构造是否成功。上层**必须**检查，不要再靠"没崩就是好的"。
+    bool ready() const { return ready_; }
+    const std::string& lastError() const { return load_error_; }
+
+    GameEngine(const std::string& jsonPath) {
+        const std::string storyPath = resolve_data_path(jsonPath);
+        std::ifstream file(storyPath);
+        if (!file.is_open()) {
+            load_error_ = "剧本文件打开失败: " + storyPath;
+            return;
+        }
+        try {
+            file >> storyData;
+        } catch (const std::exception& e) {
+            load_error_ = std::string("剧本 JSON 解析失败: ") + e.what();
+            return;
+        }
+        if (!storyData.contains("nodes")) {
+            load_error_ = "剧本缺少 nodes 字段: " + storyPath;
+            return;
+        }
+        currentNode = "0";
+        db = new DatabaseManager(resolve_data_path("../data/save.db"));
+        ready_ = true;
+    }
+
+    ~GameEngine() { delete db; db = nullptr; }
 
     std::string getCurrentNode() const { return currentNode; }
 
@@ -43,10 +90,11 @@ public:
         playerName = name;
         affinity = 90; 
         currentNode = "0";
-        db->saveData(playerName, affinity, currentNode);
+        if (db) db->saveData(playerName, affinity, currentNode);
     }
 
     bool loadExistingPlayer(const std::string& name) {
+        if (!db) return false;
         int savedAffinity = 0;
         std::string savedNode = "0";
         if (db->loadData(name, savedAffinity, savedNode)) {
@@ -187,7 +235,7 @@ public:
                         
                         std::string reward = current_node_data["intent_nodes"][aiNextNode]["reward_item"].get<std::string>();
                         std::cout << "【系统奖励】玩家获得道具: " << reward << "，已存入数据库！" << std::endl;
-                        db->addItem(playerName, reward);
+                        if (db) db->addItem(playerName, reward);
                     }
                     
                     nextNode = aiNextNode;
@@ -213,8 +261,9 @@ public:
 
     bool isGameOver() { return currentNode == "-1"; }
 
-    std::vector<DatabaseManager::SaveInfo> getAllSaves() { return db->getAllSaves(); }
+    // db 可能为 nullptr（构造失败时），这里返回空集而不是崩溃，让上层能体面降级。
+    std::vector<DatabaseManager::SaveInfo> getAllSaves() { if (!db) return {}; return db->getAllSaves(); }
     std::string getLastAiReply() { return lastAiReply; }
-    void deleteSaveData(const std::string& name) { db->deleteSave(name); }
+    void deleteSaveData(const std::string& name) { if (db) db->deleteSave(name); }
     void applyPenalty(int penalty) { affinity += penalty; if (db && !playerName.empty()) db->saveData(playerName, affinity, currentNode); }
 };

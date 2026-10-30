@@ -30,6 +30,14 @@ int main(int argc, char *argv[]) {
     GameEngine engine("../data/story.json");
     SecurityFilter security;
 
+    // 构造失败必须显式暴露：以前是静默的，随后任何数据库操作都会 SIGSEGV。
+    if (!engine.ready()) {
+        QMessageBox::critical(nullptr, "启动失败",
+                              QString::fromStdString(engine.lastError()) +
+                              "\n\n请把工作目录切到 build/ 或项目根目录后重试。");
+        return 1;
+    }
+
     QWidget window;
     window.setWindowTitle("FluidStory - Powered by NarrativeX");
     window.resize(1000, 700); 

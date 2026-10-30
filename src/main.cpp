@@ -27,6 +27,13 @@ int main() {
     GameEngine engine("../data/story.json");
     SecurityFilter security;
 
+    // 构造失败必须显式暴露：以前这一步是静默的，后面一调用就 SIGSEGV。
+    if (!engine.ready()) {
+        std::cerr << "\n【致命错误】" << engine.lastError() << "\n"
+                  << "请把工作目录切到 build/ 或项目根目录后重试。\n";
+        return 1;
+    }
+
     bool isRunning = true;
     
     while (isRunning) {

@@ -1,0 +1,88 @@
+{
+  // 远程 Linux (Ubuntu VM) 上的断点调试配置。
+  // 前提：VS Code 已通过 Remote-SSH 连上ubuntu，并打开了 /home/cyc/isolate-galgame-server-main
+  // 使用：左侧「运行和调试」面板 → 顶部下拉选择配置 → 按 F5
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "① 调试 nx_terminal（终端版，推荐先练这个）",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/nx_terminal",
+      "args": [],
+      // 必须是 build/：程序里的数据路径按 build 目录推算（engine 内部还会再兜一层）
+      "cwd": "${workspaceFolder}/build",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "构建 nx_terminal",
+      "setupCommands": [
+        { "description": "启用 STL 整齐打印", "text": "-enable-pretty-printing", "ignoreFailures": true },
+        { "description": "gdb 不做分页", "text": "set pagination off", "ignoreFailures": true },
+        // 让 gdb 直接打印中文，而不是 \346\210\221 这种八进制转义
+        { "description": "字符集交给宿主机处理", "text": "set charset UTF-8", "ignoreFailures": true }
+      ]
+    },
+
+    {
+      "name": "② 调试 fluidstory（Qt GUI · offscreen，无窗口也能跑）",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/fluidstory",
+      "cwd": "${workspaceFolder}/build",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "构建 fluidstory",
+      "environment": [
+        // VM 通常没有 X 服务，用 offscreen 后端可以避免 "could not connect to display"
+        // 程序逻辑照常跑，只是窗口不可见——调试业务逻辑够用了
+        { "name": "QT_QPA_PLATFORM", "value": "offscreen" },
+        { "name": "QT_LOGGING_RULES", "value": "*.debug=false" }
+      ],
+      "setupCommands": [
+        { "description": "启用 STL 整齐打印", "text": "-enable-pretty-printing", "ignoreFailures": true },
+        { "description": "gdb 不做分页", "text": "set pagination off", "ignoreFailures": true },
+        { "description": "字符集交给宿主机处理", "text": "set charset UTF-8", "ignoreFailures": true }
+      ]
+    },
+
+    {
+      "name": "③ 调试 fluidstory（Qt GUI · 投到 Windows 桌面，需先开 X 服务）",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/fluidstory",
+      "cwd": "${workspaceFolder}/build",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "构建 fluidstory",
+      "environment": [
+        // ⚠ 把 192.168.88.1 换成你 Windows 上 VMnet8 网卡的真实 IP（ipconfig 里看）
+        //    并在 Windows 上先运行 VcXsrv（勾选 Disable access control）
+        { "name": "DISPLAY", "value": "192.168.88.1:0.0" }
+      ],
+      "setupCommands": [
+        { "description": "启用 STL 整齐打印", "text": "-enable-pretty-printing", "ignoreFailures": true },
+        { "description": "gdb 不做分页", "text": "set pagination off", "ignoreFailures": true },
+        { "description": "字符集交给宿主机处理", "text": "set charset UTF-8", "ignoreFailures": true }
+      ]
+    },
+
+    {
+      "name": "④ 附加到已运行的进程（Attach）",
+      "type": "cppdbg",
+      "request": "attach",
+      "program": "${workspaceFolder}/build/nx_terminal",
+      "processId": "${command:pickProcess}",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "setupCommands": [
+        { "description": "启用 STL 整齐打印", "text": "-enable-pretty-printing", "ignoreFailures": true }
+      ]
+    }
+  ]
+}

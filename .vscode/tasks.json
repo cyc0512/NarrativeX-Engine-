@@ -1,0 +1,46 @@
+{
+  // 构建任务。launch.json 里的 preLaunchTask 会先跑这里的任务，
+  // 所以每次按 F5 都是「先编译最新版，再进入调试」，不会调试到旧二进制。
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake 配置",
+      "type": "shell",
+      "command": "cmake -S ${workspaceFolder} -B ${workspaceFolder}/build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+      "problemMatcher": ["$gcc"],
+      "detail": "生成 build/ 目录与 compile_commands.json（IntelliSense 会用到）"
+    },
+    {
+      "label": "构建 nx_terminal",
+      "type": "shell",
+      "command": "cmake --build ${workspaceFolder}/build --target nx_terminal -j 2",
+      "dependsOn": "CMake 配置",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"],
+      "detail": "只编译终端版，最快"
+    },
+    {
+      "label": "构建 fluidstory",
+      "type": "shell",
+      "command": "cmake --build ${workspaceFolder}/build --target fluidstory -j 2",
+      "dependsOn": "CMake 配置",
+      "problemMatcher": ["$gcc"],
+      "detail": "编译 Qt GUI 版（含 AUTOMOC，比终端版慢）"
+    },
+    {
+      "label": "全部构建",
+      "type": "shell",
+      "command": "cmake --build ${workspaceFolder}/build -j 2",
+      "dependsOn": "CMake 配置",
+      "problemMatcher": ["$gcc"],
+      "detail": "两个目标都编"
+    },
+    {
+      "label": "回归验证（内核+持久化+参考实现）",
+      "type": "shell",
+      "command": "bash ${workspaceFolder}/persistence/tests/verify_all.sh",
+      "problemMatcher": [],
+      "detail": "跑四层一体化验证脚本"
+    }
+  ]
+}
