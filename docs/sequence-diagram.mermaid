@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+    participant U as 玩家
+    participant MW as MainWindow
+    participant GS as GameSession
+    participant NE as NarrativeEngine
+    participant FS as FrontierScorer
+    participant IM as IntentMatcher
+    participant LL as CurlLlmSelector
+    participant AE as AiEngine
+    participant ES as EventStore
+
+    U->>MW: 输入中文「你口袋里藏了什么」+ 点发送
+    MW->>MW: showInput() 收起输入框, 发送按钮禁用
+    MW->>GS: step(text)
+    GS->>NE: step(user_input)
+    NE->>FS: refresh(cat, st) —— 干净的 Frontier
+    FS-->>NE: FrontierView{items, blocked}
+    NE->>NE: match_option(input, cur) —— L0 快判
+    alt 命中选项序号
+        NE-->>GS: TurnResult{layer:"L0"}
+    else 未命中
+        NE->>IM: decide(input, cat, cands, default_next, llm)
+        IM->>IM: l0() 关键词强命中且无歧义?
+        alt L0 独占命中
+            IM-->>NE: IntentDecision{layer:"L0"}
+        else 进入 L1 打分
+            IM->>IM: l1() + mmr() -> shortlist(5)
+            IM->>LL: select_with_reply(input, shortlist)
+            LL->>AE: analyze_route(input, routes_injected)
+            AE->>AE: HTTP POST (curl, timeout 10s)
+            AE-->>LL: {node_id, reply}
+            LL-->>IM: LlmReply{node_id, reply, ok}
+            alt node_id 在 shortlist 白名单内
+                IM-->>NE: IntentDecision{layer:"L2", confidence:1.0}
+            else 幻觉 / 超时 / 异常
+                IM-->>NE: IntentDecision{layer:"L1", reason:"已降级"}
+            end
+        end
+    end
+    NE->>NE: 应用 effects(tags/items/affinity/phase)
+    NE->>NE: 兄弟节点压入 PendingPool(alts)
+    NE->>NE: ++st.seq; last_visit/visited/current_node 更新
+    NE->>NE: pool_.scan() —— 后向指针唤醒
+    NE-->>GS: TurnResult{to_node, events, presentation, frontier_in, blocked}
+    GS->>ES: append(session, seq, "TURN", state_json) —— 单一事务
+    ES-->>GS: ok
+    GS-->>MW: TurnResult
+    MW->>MW: dialogBox->setText(presentation.npc_text)
+    MW->>MW: refreshUI() —— 渲染选项 + 唯一的自由输入按钮

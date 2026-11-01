@@ -1,0 +1,234 @@
+classDiagram
+    class NodeSpec {
+        +string id
+        +NodeKind kind
+        +bool terminal
+        +string narrator
+        +string npc_text
+        +string npc_state
+        +string hint
+        +RedeemVariant redeem_variant
+        +vector~OptionDef~ options
+        +string default_next
+        +string fallback_next
+        +Seq min_step
+        +Seq max_step
+        +vector~string~ phases
+        +int phase_index_min
+        +int phase_index_max
+        +Condition requires_fn
+        +int priority
+        +double weight
+        +int affinity_anchor
+        +bool once
+        +int cooldown
+        +bool redeemable
+        +Condition redeem_gate
+        +Seq redeem_expire
+        +Effects effects
+        +IntentHint intent
+        +int bucket()
+        +bool window_ok(Seq)
+        +bool phase_ok(string,int)
+    }
+    class RedeemVariant {
+        +bool has
+        +string narrator
+        +string npc_text
+        +string npc_state
+    }
+    class Effects {
+        +vector~string~ add_tags
+        +vector~string~ remove_tags
+        +vector~string~ add_items
+        +vector~string~ remove_items
+        +double affinity_delta
+        +string set_phase
+        +string summary_hint
+    }
+    class IntentHint {
+        +string description
+        +vector~string~ keywords
+        +vector~string~ examples
+        +vector~string~ negatives
+        +bool must_freeform
+    }
+    class Catalog {
+        +map~string,NodeSpec~ nodes
+        +vector~string~ phases
+        +Index index
+        +put(NodeSpec)
+        +find(string) NodeSpec
+        +phase_index_of(string) int
+        +candidate_ids(set,set,string) vector
+        +finalize_index()
+    }
+    class GameState {
+        +string session_id
+        +Seq seq
+        +string phase
+        +int phase_index
+        +string current_node
+        +int affinity
+        +set~string~ tags
+        +set~string~ items
+        +map~string,Seq~ visited
+        +map~string,Seq~ last_visit
+        +map~string,int~ visit_count
+        +vector~PendingEntry~ pending
+        +uint64 rng_state
+        +string summary
+        +vector~HistoryTurn~ history_tail
+        +count_of(string) int
+        +has_tag(string) bool
+        +has_item(string) bool
+    }
+    class PendingEntry {
+        +string node_id
+        +Seq birth_seq
+        +string reason
+        +string source_node
+        +int attempts
+        +bool awake
+        +Seq awake_seq
+    }
+    class FrontierScorer {
+        +FrontierWeights w_
+        +gate(Catalog,GameState,string) BlockReason
+        +score(Catalog,GameState,string,PendingEntry) Candidate
+        +refresh(Catalog,GameState,map,Rng) FrontierView
+        +top_k(FrontierView,int) vector
+    }
+    class Candidate {
+        +string id
+        +int bucket
+        +double score
+        +map~string,double~ parts
+        +explain() string
+    }
+    class PendingPool {
+        +push(Catalog,GameState,string,string,string) bool
+        +scan(Catalog,GameState) map
+        +open_count(GameState) int
+    }
+    class IntentMatcher {
+        +l0(string,NodeSpec) double
+        +l1(string,Catalog,vector) vector
+        +mmr(Catalog,vector,int) vector
+        +decide(string,Catalog,vector,string,ILlmSelector) IntentDecision
+    }
+    class ILlmSelector {
+        <<interface>>
+        +select(string,vector) string
+        +select_with_reply(string,vector) LlmReply
+    }
+    class CurlLlmSelector {
+        +AiEngine* ai_
+        +bool offline_
+        +select_with_reply(string,vector) LlmReply
+    }
+    class LlmReply {
+        +string node_id
+        +string reply
+        +bool ok
+        +string reason
+    }
+    class NarrativeEngine {
+        +Catalog cat_
+        +GameState st_
+        +FrontierScorer scorer_
+        +IntentMatcher matcher_
+        +PromptAssembler prompter_
+        +PendingPool pool_
+        +ILlmSelector* llm_
+        +step(string) TurnResult
+        +build_prompt(string) PromptResult
+        +present(string) Presentation
+        +frontier_in_ids() vector
+        +blocked_map() map
+        +is_over() bool
+        +debug_frontier() string
+        +set_selector(ILlmSelector*)
+        +state() GameState
+    }
+    class TurnResult {
+        +string from_node
+        +string to_node
+        +int affinity_change
+        +string layer
+        +string reason
+        +double confidence
+        +vector~string~ events
+        +vector~string~ redeemed
+        +vector~string~ routes_injected
+        +Presentation presentation
+        +vector~string~ frontier_in
+        +map~string,vector~ blocked
+        +Seq seq
+    }
+    class Presentation {
+        +string narrator
+        +string npc_text
+        +string npc_state
+        +bool is_redeem_variant
+    }
+    class EventStore {
+        +append(session,seq,type,payload) bool
+        +replay(session) vector
+        +snapshot(session) GameState
+    }
+    class GameSession {
+        +NarrativeEngine* nx_
+        +EventStore* store_
+        +DatabaseManager* db_
+        +bool offline_
+        +new_game(string) bool
+        +load(string) bool
+        +step(string) TurnResult
+        +save() bool
+        +current_text() string
+        +options() vector
+        +debug_frontier() string
+    }
+    class MainWindow {
+        +GameSession* session_
+        +QLabel* dialogBox_
+        +QLineEdit* inputBox_
+        +QWidget* optionsWidget_
+        +QWidget* inputWidget_
+        +refreshUI()
+        +showInput()
+        +onSend()
+        +gamePage() QWidget
+        +inputBox() QLineEdit
+    }
+    class FsPaths {
+        +resolve(string) string
+    }
+    class FsConfig {
+        +load(string) bool
+        +api_key() string
+        +is_offline() bool
+    }
+
+    Catalog "1" o-- "many" NodeSpec : 持有
+    NodeSpec "1" *-- "1" RedeemVariant : 组合
+    NodeSpec "1" *-- "1" Effects : 组合
+    NodeSpec "1" *-- "1" IntentHint : 组合
+    GameState "1" o-- "many" PendingEntry : 挂起池
+    NarrativeEngine "1" o-- "1" Catalog : 剧本
+    NarrativeEngine "1" o-- "1" GameState : 状态
+    NarrativeEngine "1" o-- "1" FrontierScorer : 打分
+    NarrativeEngine "1" o-- "1" IntentMatcher : 意图
+    NarrativeEngine "1" o-- "1" PendingPool : 挽回
+    NarrativeEngine "1" --> "0..1" ILlmSelector : 依赖注入
+    ILlmSelector <|.. CurlLlmSelector : 实现
+    CurlLlmSelector ..> LlmReply : 产出
+    NarrativeEngine ..> TurnResult : 产出
+    TurnResult "1" *-- "1" Presentation : 组合
+    FrontierScorer ..> Candidate : 产出
+    GameSession "1" o-- "1" NarrativeEngine : 编排
+    GameSession "1" o-- "1" EventStore : 持久化
+    GameSession ..> FsConfig : 离线探测
+    GameSession ..> FsPaths : 路径解析
+    MainWindow "1" o-- "1" GameSession : 驱动

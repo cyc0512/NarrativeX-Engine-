@@ -95,3 +95,24 @@ FluidStory（流态小说） 并非传统视觉小说的 AI 套壳，而是一�
 ```bash
 sudo apt install qtbase5-dev libqt5concurrent5 libsqlite3-dev libcurl4-openssl-dev
 ```
+
+### 构建与运行
+
+> 目录名与 CMake target 已统一为 **FS**：终端版 `fs_terminal`，Qt GUI 版 `fs`。
+> 程序内的数据路径（`../data/story.json`、`../assets/bg.jpg`）是相对路径，
+> 所以**必须把工作目录切到 `build/`**（或项目根目录）再运行。
+
+```bash
+cd fs
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build -j 2
+
+# 终端版
+cd build && ./fs_terminal
+
+# Qt GUI 版（无 X 服务时可加 QT_QPA_PLATFORM=offscreen）
+cd build && ./fs
+```
+
+> ⚠️ 目录改名后 **必须删掉 `build/` 重新 cmake**：`build/CMakeCache.txt` 里记录了绝对源码目录，
+> 直接复用会报 `CMakeCache.txt ... is different than the directory ...`。

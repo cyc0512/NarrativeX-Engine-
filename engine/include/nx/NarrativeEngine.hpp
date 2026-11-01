@@ -18,6 +18,7 @@
 // ---------------------------------------------------------------------------
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -32,6 +33,21 @@
 
 namespace nx {
 
+// 喂给 LLM 的候选池 / 白名单大小（判据见 build_prompt 注释：候选池必须**大于**短名单，
+// 否则 MMR 退化为恒等变换、去冗余机制失效）。
+//   kRoutePoolSize   = 先按 bucket+score 取前 12 个作为 MMR 的候选池
+//   kRouteShortlist  = MMR 去冗余后真正注入 prompt 的白名单条数
+constexpr std::size_t kRoutePoolSize = 12;
+constexpr std::size_t kRouteShortlist = 5;
+
+// 本步应当呈现给玩家的文本（旁白 / 台词 / NPC 状态）。
+// is_redeem_variant=true 表示用的是 presentation.redeem_variant，即
+// "这个节点是被后向指针拉回来的，台词按现在的口径重讲了一遍"。
+struct Presentation {
+    std::string narrator, npc_text, npc_state;
+    bool is_redeem_variant = false;
+};
+
 struct TurnResult {
     NodeId from_node;
     NodeId to_node;
@@ -44,6 +60,16 @@ struct TurnResult {
     FrontierScorer::FrontierView frontier_before;  // 用于调试/回放
     std::vector<NodeId> routes_injected;           // 本次喂给 LLM 的白名单
     Seq seq = 0;
+    Presentation presentation;                     // 本步呈现的文本（B-5 断言来源）
+    std::vector<NodeId> frontier_in;               // 本步 IN 列表（A-1/A-3/B-6/B-7 来源）
+    std::unordered_map<std::string, std::vector<NodeId>> blocked;  // reason -> ids
+    // 本轮 prompt 的**实测** token 数（estimate_tokens 算），硬上限 kMaxPromptTokens。
+    // 注意这是"如果要发 L2 会发多大"，不等于实际消耗 —— 见 prompt_sent。
+    int prompt_tokens = 0;
+    // 本轮是否**真的**把 prompt 发给了 LLM。L0/L1 命中时不发请求，实耗 0 token；
+    // 只有 L2 才会真的发出去。甲方"每轮 ≤1200 token"约束要的是本字段为 true 时
+    // 的 prompt_tokens；离线档（llm_ == nullptr）全程为 false。
+    bool prompt_sent = false;
 };
 
 class NarrativeEngine {
@@ -103,6 +129,23 @@ public:
             next = st_.current_node;
         }
         const NodeSpec& node = *cat_.find(next);
+
+        // ---- 2b. 本轮 prompt 的实测 token 数 ----
+        // 必须排在副作用（第 3 步）**之前**采样：L2 若真的要发请求，用的就是此刻
+        // 这份尚未被 effects 污染的 state；放在之后会算出"下一步"的 prompt。
+        // prompt_sent 区分"会发多大"与"真的发了"：L0/L1 命中不发请求，实耗 0。
+        tr.prompt_tokens = static_cast<int>(build_prompt(
+            (current && !current->npc_state.empty()) ? current->npc_state : "平静"
+        ).est_tokens);
+        tr.prompt_sent = (tr.layer == "L2");
+
+        // 抓取"本次进入之前"的 last_visit，供 present() 判断是否该用挽回变体。
+        // 必须早于第 5 步的 visit 更新，否则刚写入的 seq 会让判定失效。
+        Seq prev_last_visit = -1;
+        {
+            auto it0 = st_.last_visit.find(next);
+            if (it0 != st_.last_visit.end()) prev_last_visit = it0->second;
+        }
 
         // ---- 3. 确定性副作用 ----
         const int before = st_.affinity;
@@ -170,16 +213,115 @@ public:
         tr.to_node = next;
         tr.affinity_change = st_.affinity - before;
         tr.seq = st_.seq;
+        tr.presentation = present(next, prev_last_visit);
+        // 与 Python 参考实现对齐：`frontier_in` / `blocked` 记录的是**本步 refresh**
+        // 的结果（副作用生效**之前**的干净 Frontier），而不是步进之后的状态。
+        // 想看步进之后的 Frontier，请显式调 frontier_in_ids() / blocked_map()。
+        tr.frontier_in.clear();
+        tr.frontier_in.reserve(tr.frontier_before.items.size());
+        for (const auto& c : tr.frontier_before.items) tr.frontier_in.push_back(c.id);
+        tr.blocked.clear();
+        for (const auto& kv : tr.frontier_before.blocked) {
+            std::vector<NodeId> ids = kv.second;
+            std::sort(ids.begin(), ids.end());
+            tr.blocked[kv.first] = std::move(ids);
+        }
         return tr;
+    }
+
+    // ------------------------------------------------------------------
+    // 结构化 API：断言必须建立在这上面，不能靠 grep debug_frontier() 的字符串。
+    // 原因：节点名互为前缀时（n5_search / n5_search_x）子串匹配会误判，
+    //       且 C++ 与 Python 两份日志格式一旦漂移就无从比对。
+    // ------------------------------------------------------------------
+
+    // 当前 time_cursor 下 Frontier 的 IN 列表（已按 bucket/score/id 排好序）。
+    std::vector<NodeId> frontier_in_ids() const {
+        const FrontierScorer::FrontierView v = scorer_.refresh(cat_, st_, nullptr, nullptr);
+        std::vector<NodeId> out;
+        out.reserve(v.items.size());
+        for (const auto& c : v.items) out.push_back(c.id);
+        return out;
+    }
+
+    // {拦截原因: [节点 id...]}，每种原因内部按字典序排好，保证输出可 diff。
+    std::unordered_map<std::string, std::vector<NodeId>> blocked_map() const {
+        const FrontierScorer::FrontierView v = scorer_.refresh(cat_, st_, nullptr, nullptr);
+        std::unordered_map<std::string, std::vector<NodeId>> out;
+        for (const auto& kv : v.blocked) {
+            std::vector<NodeId> ids = kv.second;
+            std::sort(ids.begin(), ids.end());
+            out[kv.first] = std::move(ids);
+        }
+        return out;
+    }
+
+    // 决定本步呈现哪一套文本：首次访问的 presentation，还是挽回变体。
+    //
+    // 判定规则（比 ARCH §4.2-(2) 原文的 `awake_seq == st_.seq` 更通用）：
+    //     存在 pending 条目 e 使 e.node_id == id 且 e.awake，并且
+    //         e.awake_seq == st_.seq              （本步刚被唤醒）
+    //     或  e.awake_seq > prev_last_visit        （唤醒发生在上一次访问之后）
+    //
+    // ARCH 原文只覆盖第一种情形；但实际流程里"唤醒"发生在第 N 步的 step 6，
+    // 玩家真正走进这个节点是第 N+1 步，此刻 awake_seq != st_.seq。
+    // 只按原文实现的话，用例 B 的 n3_tender 会错误地回放首次台词，
+    // B-5（不回放旧文本）直接失败。故补上第二种情形。
+    Presentation present(const NodeId& id, Seq prev_last_visit = -1) const {
+        Presentation p;
+        const NodeSpec* n = cat_.find(id);
+        if (n == nullptr) return p;
+
+        bool use_variant = false;
+        if (n->redeem_variant.has) {
+            for (const auto& e : st_.pending) {
+                if (e.node_id != id || !e.awake) continue;
+                if (e.awake_seq == st_.seq || prev_last_visit < 0
+                    || e.awake_seq > prev_last_visit) {
+                    use_variant = true;
+                    break;
+                }
+            }
+        }
+        if (use_variant) {
+            p.narrator  = n->redeem_variant.narrator.empty()  ? n->narrator
+                                                              : n->redeem_variant.narrator;
+            p.npc_text  = n->redeem_variant.npc_text.empty()  ? n->npc_text
+                                                              : n->redeem_variant.npc_text;
+            p.npc_state = n->redeem_variant.npc_state.empty() ? n->npc_state
+                                                              : n->redeem_variant.npc_state;
+            p.is_redeem_variant = true;
+            return p;
+        }
+        p.narrator = n->narrator;
+        p.npc_text = n->npc_text;
+        p.npc_state = n->npc_state;
+        p.is_redeem_variant = false;
+        return p;
     }
 
     // 组装本步要发给 LLM 的 prompt。返回的白名单必须与 tr.routes_injected 一致，
     // 上层在做 L2 校验时要拿它做交集检查。
     PromptResult build_prompt(const std::string& npc_state) const {
+        // 候选池的取法（**判据来自机制意图层，不是"因为 Python 写的是 12"**）：
+        //
+        //   MMR 的设计意图是"从一个**大于短名单**的候选池里，在保留相关性的同时
+        //   去掉语义重复项，最终取回 K 条"。当候选池大小 == K 时，MMR 退化为恒等
+        //   变换 —— 池子里每一条都会被原样取回，去冗余这一步等于没跑，整个机制失效。
+        //
+        //   旧代码用 `scorer_.weights().top_k`（= K = 5）当候选池，正是这个失效形态。
+        //   故候选池必须显式大于短名单：`kRoutePoolSize(12) > kRouteShortlist(5)`。
+        //   打分口径也据此定为 Frontier 的 `c.score`（旧代码用 `matcher_.l1("", ...)`
+        //   拿空输入重算一遍分，空输入下 l1 分与 c.score 不同，MMR 排序会无故漂移）。
+        //
+        //   ⚠ 这条改动的判据是"MMR 不能退化"，属 ARCH 机制层；不要把本注释读成
+        //     "为了和 Python 对齐才改成 12" —— 规范来自设计与意图层，参考实现只做回归锁。
         auto view = scorer_.refresh(cat_, st_, nullptr, nullptr);
-        auto head = FrontierScorer::top_k(view, static_cast<std::size_t>(scorer_.weights().top_k));
-        auto scored = matcher_.l1("", cat_, head);
-        auto ids = matcher_.mmr(cat_, scored, 5u);
+        auto head = FrontierScorer::top_k(view, kRoutePoolSize);
+        std::vector<std::pair<NodeId, double>> scored;
+        scored.reserve(head.size());
+        for (const auto& c : head) scored.emplace_back(c.id, c.score);
+        auto ids = matcher_.mmr(cat_, scored, kRouteShortlist);
         std::vector<std::pair<NodeId, std::string>> routes;
         for (const auto& id : ids) routes.emplace_back(id, cat_.find(id)->intent.description);
         return prompter_.build("你扮演木子因，一个对哥哥有极端依赖的高中生。",

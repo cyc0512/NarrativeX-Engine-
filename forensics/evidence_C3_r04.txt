@@ -1,0 +1,19 @@
+[driver] 目标：3 条自由输入，每条等待 5600 ms（> 5000 才能覆盖 5 秒定时器）
+【数据库】成功连接数据库: ../data/save.db
+[driver] 点击「开始新游戏」
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+[driver] 填写玩家名并确认
+[driver] 点击固定选项 [1. 过去帮忙。] 以便进入 intent 节点
+[driver] R-04 校验：界面上「自由输入」入口数 = 1（去重后应为 1）
+[driver] #1 点击「自由输入」按钮
+[driver] #1 发送(len=0): 
+[driver] #2 发送(len=3):    
+【系统】木子因正在思考中...
+[driver] #3 发送(len=39): 我想看看你口袋里到底是什么
+【系统】木子因正在思考中...
+【AI原始文本】 {"affinity_change": 0, "next_node": "end_getitem", "reply": "哥哥，那个……别碰，这是我的小秘密。"}
+【系统奖励】玩家获得道具: item_hairclip，已存入数据库！
+【系统】AI 判定跳转至节点: end_getitem
+DRIVER_RESULT: sends=3/3  crash=0  (全部输入跑完，未崩溃)
+[driver] qt_main 返回 rc=0

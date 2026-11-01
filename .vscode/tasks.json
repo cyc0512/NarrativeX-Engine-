@@ -11,18 +11,18 @@
       "detail": "生成 build/ 目录与 compile_commands.json（IntelliSense 会用到）"
     },
     {
-      "label": "构建 nx_terminal",
+      "label": "构建 fs_terminal",
       "type": "shell",
-      "command": "cmake --build ${workspaceFolder}/build --target nx_terminal -j 2",
+      "command": "cmake --build ${workspaceFolder}/build --target fs_terminal -j 2",
       "dependsOn": "CMake 配置",
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": ["$gcc"],
       "detail": "只编译终端版，最快"
     },
     {
-      "label": "构建 fluidstory",
+      "label": "构建 fs",
       "type": "shell",
-      "command": "cmake --build ${workspaceFolder}/build --target fluidstory -j 2",
+      "command": "cmake --build ${workspaceFolder}/build --target fs -j 2",
       "dependsOn": "CMake 配置",
       "problemMatcher": ["$gcc"],
       "detail": "编译 Qt GUI 版（含 AUTOMOC，比终端版慢）"

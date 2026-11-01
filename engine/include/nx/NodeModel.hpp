@@ -59,6 +59,17 @@ struct OptionDef {
     NodeId next;
 };
 
+// 挽回变体台词 —— 事件被后向指针拉回时呈现的文本。
+//
+// 它存在的唯一理由是实现硬约束 C2（动态重生成）：
+//   唤醒时**不回放旧台词**，而是在"过去的时间语境里、用现在的口径把这件事重讲一遍"。
+// 没有变体的话，玩家第二次走到同一个节点会看到一模一样的文本，
+// "挽回"在观感上就退化成了"读档重来"。
+struct RedeemVariant {
+    bool has = false;
+    std::string narrator, npc_text, npc_state;
+};
+
 // 进入节点时产生的**确定性**副作用。
 // 注意：这里只允许写"能被 SQLite 记下来"的东西。
 // 任何浮点蓄电池式的临时量都不允许进 Effects。
@@ -91,6 +102,9 @@ struct NodeSpec {
     std::string narrator, npc_text, npc_state, hint;
     std::vector<OptionDef> options;
     NodeId default_next, fallback_next;
+
+    // 挽回变体（C2：不回放旧台词）。redeemable 节点必须提供，lint 会拦。
+    RedeemVariant redeem_variant;
 
     // 支柱一：生命周期（配合 time_cursor）
     Seq min_step = 0;

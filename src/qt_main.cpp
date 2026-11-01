@@ -15,8 +15,10 @@
 #include <QMenu>
 #include <QAction>
 #include <QPoint>
+#include <QPointer>
 #include <QTimer>
 #include <functional>
+#include <memory>
 #include <vector>
 #include <string>
 #include "GameEngine.h"
@@ -32,14 +34,14 @@ int main(int argc, char *argv[]) {
 
     // 构造失败必须显式暴露：以前是静默的，随后任何数据库操作都会 SIGSEGV。
     if (!engine.ready()) {
-        QMessageBox::critical(nullptr, "启动失败",
+        QMessageBox::critical(nullptr, "FS · 启动失败",
                               QString::fromStdString(engine.lastError()) +
                               "\n\n请把工作目录切到 build/ 或项目根目录后重试。");
         return 1;
     }
 
     QWidget window;
-    window.setWindowTitle("FluidStory - Powered by NarrativeX");
+    window.setWindowTitle("FS · FluidStory");
     window.resize(1000, 700); 
     window.setStyleSheet("background-color: #1a1a1a;");
 
@@ -67,11 +69,17 @@ int main(int argc, char *argv[]) {
     QVBoxLayout *mainMenuLayout = new QVBoxLayout(mainMenuPage);
     mainMenuLayout->setAlignment(Qt::AlignCenter);
 
-    QLabel *titleLabel = new QLabel("FluidStory", mainMenuPage);
+    QLabel *titleLabel = new QLabel("FS", mainMenuPage);
     titleLabel->setFont(QFont("Microsoft YaHei", 60, QFont::Bold));
-    titleLabel->setStyleSheet("color: white; margin-bottom: 40px;");
+    titleLabel->setStyleSheet("color: white; margin-bottom: 0px;");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainMenuLayout->addWidget(titleLabel);
+
+    QLabel *subTitleLabel = new QLabel("FluidStory Demo", mainMenuPage);
+    subTitleLabel->setFont(QFont("Microsoft YaHei", 16));
+    subTitleLabel->setStyleSheet("color: #bdc3c7; margin-bottom: 40px;");
+    subTitleLabel->setAlignment(Qt::AlignCenter);
+    mainMenuLayout->addWidget(subTitleLabel);
 
     QPushButton *startBtn = new QPushButton("开始新游戏", mainMenuPage);
     startBtn->setFixedSize(250, 50);
@@ -163,7 +171,7 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(saveAction, &QAction::triggered, [&]() {
         engine.applyPenalty(0);
-        QMessageBox::information(&window, "系统", "进度已保存！");
+        QMessageBox::information(&window, "FS · 系统", "进度已保存！");
     });
 
     QObject::connect(backToMenuAction, &QAction::triggered, [&]() {
@@ -172,9 +180,30 @@ int main(int argc, char *argv[]) {
     });
 
     // ==========================================
+    // 自由输入的**唯一**唤起入口（R-04）
+    //
+    // 以前有两个入口同时存在：
+    //   ① 剧本 data/story.json 里写死的那个选项「3. 【自由输入】我想自己说点什么...」，
+    //      它走的是"选项按钮"的分支，点了就唤起输入框；
+    //   ② 代码里 hasIntent 为真时又强制生成的一个「【自由输入】对她说点什么...」按钮。
+    // 甲方看到的"两个自由输入"就是这么来的。
+    // 处置：剧本里那个选项删掉（自由输入是引擎能力，不该写成剧本选项），
+    //      代码里只留下面这一个 showInput()，所有唤起路径都走它。
+    // ==========================================
+    std::function<void()> showInput;
+    showInput = [&]() {
+        inputWidget->show();
+        inputBox->setFocus();
+        for (int j = 0; j < optionsLayout->count(); ++j) {
+            QLayoutItem *it = optionsLayout->itemAt(j);
+            if (it && it->widget()) it->widget()->hide();
+        }
+    };
+
+    // ==========================================
     // 核心逻辑：刷新界面
     // ==========================================
-    std::function<void()> refreshUI; 
+    std::function<void()> refreshUI;
     refreshUI = [&]() {
         QLayoutItem *item;
         while ((item = optionsLayout->takeAt(0)) != nullptr) {
@@ -225,19 +254,14 @@ int main(int argc, char *argv[]) {
                 );
                 optionsLayout->addWidget(btn);
                 
-                QObject::connect(btn, &QPushButton::clicked, [&, i, btnText]() {
-                    if (btnText.contains("自由输入") || btnText.contains("3.")) {
-                        inputWidget->show();
-                        inputBox->setFocus();
-                        for (int j = 0; j < optionsLayout->count(); ++j) {
-                            if (optionsLayout->itemAt(j)->widget()) {
-                                optionsLayout->itemAt(j)->widget()->hide();
-                            }
-                        }
-                    } else {
-                        engine.processInput(std::to_string(i + 1));
-                        refreshUI(); 
-                    }
+                // 固定选项一律走 processInput(序号)，不再做文本特征猜测。
+                // ⚠️ 旧代码这里有一段"按钮文字含 自由输入 **或者** 含 3. 就当自由输入入口"的特判。
+                //    后半条是给旧剧本擦屁股的：任何文字里带 "3." 的选项都会被误判成自由输入。
+                //    R-04 删掉剧本里那个写死的自由输入选项后它已无匹配对象，
+                //    只剩误伤，故整段特判删除 —— 自由输入入口只保留下面 hasIntent 那一处。
+                QObject::connect(btn, &QPushButton::clicked, [&, i]() {
+                    engine.processInput(std::to_string(i + 1));
+                    refreshUI();
                 });
             }
 
@@ -251,13 +275,7 @@ int main(int argc, char *argv[]) {
                 optionsLayout->addWidget(btn);
 
                 QObject::connect(btn, &QPushButton::clicked, [&]() {
-                    inputWidget->show();
-                    inputBox->setFocus();
-                    for (int j = 0; j < optionsLayout->count(); ++j) {
-                        if (optionsLayout->itemAt(j)->widget()) {
-                            optionsLayout->itemAt(j)->widget()->hide();
-                        }
-                    }
+                    showInput();
                 });
             }
         }
@@ -317,7 +335,7 @@ int main(int argc, char *argv[]) {
                 delBtn->setStyleSheet("QPushButton { background-color: #e74c3c; color: white; border-radius: 15px; font-weight: bold; } QPushButton:hover { background-color: #c0392b; }");
                 
                 QObject::connect(delBtn, &QPushButton::clicked, [&, info]() {
-                    QMessageBox::StandardButton reply = QMessageBox::question(&window, "删除存档", "确定要删除这个存档吗？", QMessageBox::Yes | QMessageBox::No);
+                    QMessageBox::StandardButton reply = QMessageBox::question(&window, "FS · 删除存档", "确定要删除这个存档吗？", QMessageBox::Yes | QMessageBox::No);
                     if (reply == QMessageBox::Yes) {
                         engine.deleteSaveData(info.playerName);
                         refreshLoadPanel(); 
@@ -338,12 +356,23 @@ int main(int argc, char *argv[]) {
     // ==========================================
     // 发送按钮及多线程逻辑 (原生安全版)
     // ==========================================
+    // 同一时刻只允许一个 AI 请求在飞。
+    // 旧代码在 5 秒超时后就把发送按钮重新点亮，可后台的 processInput 还在跑，
+    // 玩家再点一次就会有**两个线程同时写同一个 GameEngine 和同一个 sqlite 连接**（D-6）。
+    bool aiInFlight = false;
+
     QObject::connect(sendBtn, &QPushButton::clicked, [&]() {
         QString text = inputBox->text();
         if (text.isEmpty()) return;
-        
+
+        if (aiInFlight) {
+            QMessageBox::information(&window, "FS · 提示",
+                                     "上一条还在等木子因的回复，请稍等一下。");
+            return;
+        }
+
         if (security.checkSecurity(text.toStdString())) {
-            QMessageBox::warning(&window, "警告", "检测到不文明用语！");
+            QMessageBox::warning(&window, "FS · 警告", "检测到不文明用语！");
             engine.applyPenalty(-20);
             inputBox->clear();
             inputWidget->hide();
@@ -359,10 +388,51 @@ int main(int argc, char *argv[]) {
 
         std::string nodeBeforeSend = engine.getCurrentNode();
 
-        // 开启异步任务，通过 QFutureWatcher 监听结果
+        // ==================================================================
+        // 异步 AI 请求（R-03 / D-4 修复）
+        //
+        // 【旧实现的致命缺陷】finished 回调里调了 watcher->deleteLater()，watcher
+        // 在 AI 返回后约几百毫秒内就被析构；而下面那个 5 秒 QTimer::singleShot
+        // **没有绑 context object，到点照样会响**。于是 5 秒时 watcher 已经是个
+        // 非空但悬垂的指针，`if (watcher && ...)` 拦不住它，
+        // `watcher->isFinished()` 就成了对已释放内存的解引用（heap-use-after-free）。
+        // 实测：AI 比 5 秒快时 3/3 SIGSEGV；AI 比 5 秒慢时 3/3 不崩。
+        //
+        // 【修法】四条一起上，缺一条都会留缝：
+        //   1) QPointer 持有 watcher —— 对象一被析构它立刻变 null，可判空；
+        //      （裸指针做不到这件事，它永远"非空"）
+        //   2) shared_ptr<bool> done 把"已经对玩家兑现过一次"从
+        //      "对象还活着吗"里解耦出来，两条路径抢占，后到的直接退出；
+        //   3) QTimer 交给 &window 托管 —— window 没了定时器自动停表，
+        //      不会再打出无主的回调；
+        //   4) 两条路径互相判空（isNull()），绝不碰可能已被析构的对象。
+        // ==================================================================
+        auto done = std::make_shared<bool>(false);
+
+        QTimer* timeoutTimer = new QTimer(&window);
+        timeoutTimer->setSingleShot(true);
+        // 定时器同样要用 QPointer 持有：超时路径会把它 deleteLater()，
+        // 而慢速 AI 的结果 8 秒后才回来，那时 finished 路径若再对同一个
+        // 定时器调 stop()/deleteLater() 就是 UAF（我第一版修复就踩了这个坑，
+        // 实测慢路径直接 SIGSEGV）。
+        QPointer<QTimer> timerGuard(timeoutTimer);
+
         QFutureWatcher<std::string>* watcher = new QFutureWatcher<std::string>(&window);
-        
-        QObject::connect(watcher, &QFutureWatcher<std::string>::finished, [&, watcher, nodeBeforeSend]() {
+        QPointer<QFutureWatcher<std::string>> watcherGuard(watcher);
+
+        QObject::connect(watcher, &QFutureWatcher<std::string>::finished,
+                         [&, watcherGuard, timerGuard, done, nodeBeforeSend]() {
+            // AI 正常返回：无论如何都要把按钮还给玩家，这是唯一的复位点。
+            *done = true;
+            aiInFlight = false;
+
+            if (!timerGuard.isNull()) {
+                timerGuard->stop();
+                timerGuard->deleteLater();
+            }
+
+            if (watcherGuard.isNull()) return;
+
             std::string aiText = engine.getLastAiReply();
             if (aiText.empty()) aiText = "（木子因似乎陷入了沉默）";
 
@@ -377,20 +447,26 @@ int main(int argc, char *argv[]) {
                 inputBox->setFocus();
             }
 
-            watcher->deleteLater();
+            watcherGuard->deleteLater();
         });
 
-        // 5 秒超时保护
-        QTimer::singleShot(5000, [&, watcher]() {
-            if (watcher && watcher->isFinished() == false) {
-                sendBtn->setDisabled(false);
-                dialogBox->setText("（木子因似乎陷入了长久的沉默，没有回应。）");
-                inputWidget->show();
-                inputBox->setFocus();
-                watcher->disconnect();
-                watcher->deleteLater();
-            }
+        // 5 秒超时保护：定时器由 &window 托管，window 析构时自动停表。
+        QObject::connect(timeoutTimer, &QTimer::timeout,
+                         [&, timerGuard, done]() {
+            if (*done) return;   // AI 已经兑现过了，这次只是空转
+            *done = true;
+
+            dialogBox->setText("（木子因似乎陷入了长久的沉默，没有回应。）");
+            inputWidget->show();
+            inputBox->setFocus();
+            if (!timerGuard.isNull()) timerGuard->deleteLater();
+            // ⚠️ 这里**故意不** disconnect / delete watcher：后台的 processInput
+            //    可能还在跑，留着它，等结果回来时由 finished 路径统一收尾，
+            //    同时 aiInFlight 保持为 true，避免同一时间跑两个 processInput。
         });
+
+        aiInFlight = true;
+        timeoutTimer->start(5000);
 
         // 启动后台线程执行 engine.processInput
         QFuture<std::string> future = QtConcurrent::run([&, text]() {

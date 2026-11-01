@@ -4,6 +4,10 @@
 #include <regex>
 #include <fstream>
 #include <vector> 
+#include <mutex>
+#include <atomic>
+#include <thread>
+#include <chrono>
 #include "json.hpp" 
 #include "DatabaseManager.h" 
 #include "AiEngine.h"
@@ -20,6 +24,28 @@ private:
     std::string lastAiReply;
     bool ready_ = false;
     std::string load_error_;
+
+    // D-6（跨线程访问）的止血闸门。
+    // UI 线程跑 refreshUI / 保存进度，工作线程跑 processInput（里面有十秒量级的网络等待），
+    // 两边读写的是同一份 affinity / currentNode / lastAiReply，
+    // 其中 lastAiReply 是 std::string —— 一边赋值一边拷贝是会真的炸的。
+    // 这把锁只在**极短的临界区**里持有（绝不包含网络调用），所以 UI 不会被卡住。
+    mutable std::mutex stateMutex_;
+
+    // 在飞的 processInput 条数。
+    // 用途：析构时必须先把它们等完。工作线程是通过裸引用抓 engine 的，
+    // 引擎一旦先析构，工作线程下一行就在访问已经释放的 storyData
+    // —— 实测：发送后立刻退出，ASan 报 heap-use-after-free，栈落在
+    // GameEngine::processInput 的 storyData["nodes"]（见 docs/CRASH_ROOT_CAUSE.md）。
+    std::atomic<int> inflight_{0};
+
+    // 写档失败要吭声：R-11 的真实危害就是"失败了还静默"。
+    bool persist(const char* where) {
+        if (!db) return false;
+        if (db->saveData(playerName, affinity, currentNode)) return true;
+        std::cerr << "【存档警告】" << where << " 写档失败，玩家进度没有落盘！" << std::endl;
+        return false;
+    }
 
     // 数据文件定位：兼容"从 build/ 跑"和"从项目根跑"两种习惯。
     //
@@ -75,25 +101,42 @@ public:
         ready_ = true;
     }
 
-    ~GameEngine() { delete db; db = nullptr; }
+    ~GameEngine() {
+        // 等后台的 processInput 收尾再拆引擎。上限 12 秒（覆盖 curl 的 10 秒超时），
+        // 宁可退出慢一点，也不要让工作线程在已析构的对象上继续跑。
+        for (int i = 0; i < 2400 && inflight_.load() > 0; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        if (inflight_.load() > 0) {
+            std::cerr << "【引擎警告】退出时仍有后台任务未收尾，强行析构（可能触发崩溃）。" << std::endl;
+        }
+        delete db;
+        db = nullptr;
+    }
 
-    std::string getCurrentNode() const { return currentNode; }
+    std::string getCurrentNode() const {
+        std::lock_guard<std::mutex> guard(stateMutex_);
+        return currentNode;
+    }
 
     // 👇 新增：给 UI 层判断当前节点是否支持 AI 隐藏分支
     bool hasIntentNodes() const {
+        std::lock_guard<std::mutex> guard(stateMutex_);
         if (currentNode == "-1") return false;
         json node = storyData["nodes"][currentNode];
         return node.contains("intent_nodes") && !node["intent_nodes"].empty();
     }
 
     void createNewPlayer(const std::string& name) {
+        std::lock_guard<std::mutex> guard(stateMutex_);
         playerName = name;
         affinity = 90; 
         currentNode = "0";
-        if (db) db->saveData(playerName, affinity, currentNode);
+        persist("createNewPlayer");
     }
 
     bool loadExistingPlayer(const std::string& name) {
+        std::lock_guard<std::mutex> guard(stateMutex_);
         if (!db) return false;
         int savedAffinity = 0;
         std::string savedNode = "0";
@@ -107,6 +150,7 @@ public:
     }
 
     std::vector<std::string> getCurrentNodePages() {
+        std::lock_guard<std::mutex> guard(stateMutex_);
         std::vector<std::string> pages;
         if (currentNode == "-1") {
             pages.push_back("【游戏结束】");
@@ -126,6 +170,7 @@ public:
     }
 
     std::vector<std::string> getCurrentOptions() {
+        std::lock_guard<std::mutex> guard(stateMutex_);
         std::vector<std::string> opts;
         if (currentNode == "-1") return opts;
         json node = storyData["nodes"][currentNode];
@@ -142,13 +187,27 @@ public:
     }
 
     std::string processInput(const std::string& userInput) {
-        if (currentNode == "-1") return "【游戏结束】";
+        // 在飞计数（RAII）：析构函数靠它决定能不能安全拆引擎。
+        struct InflightGuard {
+            std::atomic<int>& counter;
+            explicit InflightGuard(std::atomic<int>& c) : counter(c) { counter.fetch_add(1); }
+            ~InflightGuard() { counter.fetch_sub(1); }
+        } inflightGuard(inflight_);
+
+        // 快照：只在这一小段临界区里读一次状态，之后全程用本地副本。
+        // 网络调用（curl 最长 10 秒）绝不能持锁，否则会把 UI 线程一起锁死。
+        json current_node_data;
+        std::string nextNode;
+        {
+            std::lock_guard<std::mutex> guard(stateMutex_);
+            if (currentNode == "-1") return "【游戏结束】";
+            current_node_data = storyData["nodes"][currentNode];
+            nextNode = currentNode;
+        }
+
         std::string reply = "";
         std::string processedInput = userInput; 
-        
-        json current_node_data = storyData["nodes"][currentNode];
-        
-        std::string nextNode = currentNode;
+
         if (current_node_data.contains("default_next") && current_node_data["default_next"].is_string()) {
             nextNode = current_node_data["default_next"].get<std::string>();
         }
@@ -187,7 +246,11 @@ public:
                     if (node_data.contains("required_item")) {
                         std::string reqItem = node_data["required_item"].get<std::string>();
                         bool hasItem = false;
-                        std::vector<std::string> items = db->getItems(playerName);
+                        std::vector<std::string> items;
+                        {
+                            std::lock_guard<std::mutex> guard(stateMutex_);
+                            if (db) items = db->getItems(playerName);
+                        }
                         for (const auto& item : items) {
                             if (item == reqItem) { hasItem = true; break; }
                         }
@@ -210,7 +273,10 @@ public:
             
             if (aiResult.contains("reply") && aiResult["reply"].is_string()) {
                 reply = aiResult["reply"].get<std::string>();
-                lastAiReply = reply;
+                {
+                    std::lock_guard<std::mutex> guard(stateMutex_);
+                    lastAiReply = reply;
+                }
             } else {
                 reply = "（木子因看着你，似乎不知道该说什么。）";
             }
@@ -219,10 +285,12 @@ public:
             if (aiResult.contains("affinity_change") && aiResult["affinity_change"].is_number()) {
                 affinityChange = aiResult["affinity_change"].get<int>();
             }
-            affinity += affinityChange;
-            
-            if (affinityChange != 0) {
-                std::cout << "【后台数值变动】好感度: " << affinityChange << "，当前: " << affinity << std::endl;
+            {
+                std::lock_guard<std::mutex> guard(stateMutex_);
+                affinity += affinityChange;
+                if (affinityChange != 0) {
+                    std::cout << "【后台数值变动】好感度: " << affinityChange << "，当前: " << affinity << std::endl;
+                }
             }
             
             if (aiResult.contains("next_node") && !aiResult["next_node"].is_null() && aiResult["next_node"].is_string()) {
@@ -235,7 +303,10 @@ public:
                         
                         std::string reward = current_node_data["intent_nodes"][aiNextNode]["reward_item"].get<std::string>();
                         std::cout << "【系统奖励】玩家获得道具: " << reward << "，已存入数据库！" << std::endl;
-                        if (db) db->addItem(playerName, reward);
+                        {
+                            std::lock_guard<std::mutex> guard(stateMutex_);
+                            if (db) db->addItem(playerName, reward);
+                        }
                     }
                     
                     nextNode = aiNextNode;
@@ -253,17 +324,40 @@ public:
             }
         }
 
-        currentNode = nextNode;
-        if (db) db->saveData(playerName, affinity, currentNode);
+        {
+            std::lock_guard<std::mutex> guard(stateMutex_);
+            currentNode = nextNode;
+            persist("processInput");
+        }
         
         return reply;
     }
 
-    bool isGameOver() { return currentNode == "-1"; }
+    bool isGameOver() {
+        std::lock_guard<std::mutex> guard(stateMutex_);
+        return currentNode == "-1";
+    }
 
     // db 可能为 nullptr（构造失败时），这里返回空集而不是崩溃，让上层能体面降级。
-    std::vector<DatabaseManager::SaveInfo> getAllSaves() { if (!db) return {}; return db->getAllSaves(); }
-    std::string getLastAiReply() { return lastAiReply; }
-    void deleteSaveData(const std::string& name) { if (db) db->deleteSave(name); }
-    void applyPenalty(int penalty) { affinity += penalty; if (db && !playerName.empty()) db->saveData(playerName, affinity, currentNode); }
+    std::vector<DatabaseManager::SaveInfo> getAllSaves() {
+        std::lock_guard<std::mutex> guard(stateMutex_);
+        if (!db) return {};
+        return db->getAllSaves();
+    }
+
+    std::string getLastAiReply() {
+        std::lock_guard<std::mutex> guard(stateMutex_);
+        return lastAiReply;
+    }
+
+    void deleteSaveData(const std::string& name) {
+        std::lock_guard<std::mutex> guard(stateMutex_);
+        if (db) db->deleteSave(name);
+    }
+
+    void applyPenalty(int penalty) {
+        std::lock_guard<std::mutex> guard(stateMutex_);
+        affinity += penalty;
+        if (db && !playerName.empty()) persist("applyPenalty");
+    }
 };

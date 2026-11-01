@@ -74,17 +74,51 @@ struct IntentDecision {
 
 // ---- 文本相似度工具（中文友好，无需分词器）--------------------------------
 
+// 把 UTF-8 串按 **Unicode 码点** 切开（不依赖 ICU / locale）。
+// 非法尾字节退化为单字节，保证永不越界、永不抛异常。
+inline std::vector<std::string> utf8_chars(const std::string& text) {
+    std::vector<std::string> out;
+    std::size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        std::size_t len = 1;
+        if      ((c & 0xE0) == 0xC0) len = 2;   // 110xxxxx
+        else if ((c & 0xF0) == 0xE0) len = 3;   // 1110xxxx
+        else if ((c & 0xF8) == 0xF0) len = 4;   // 11110xxx
+        if (i + len > text.size()) len = 1;     // 截断的多字节序列，按单字节兜底
+        out.push_back(text.substr(i, len));
+        i += len;
+    }
+    return out;
+}
+
+// ⚠ **必须按码点切，不能按字节切** —— 详见下方注释。
 inline std::set<std::string> bigrams(const std::string& text) {
-    std::string s;
-    for (unsigned char c : text) {
-        if (std::isspace(c)) continue;
-        s.push_back(static_cast<char>(std::tolower(c)));
+    // 旧实现是 `for (unsigned char c : text)` 逐字节扫描 + `s.substr(i, 2)`，
+    // 也就是在 UTF-8 多字节汉字的**中间**下刀取二元组。
+    // Python 参考实现（reference/nxref.py::_bigrams）是按 Unicode 码点切的，
+    // 于是同一个输入两侧得到完全不同的二元组集合：
+    //     输入「算了，当我没说」 vs n3_tender.examples
+    //         Python（码点）：0.0        C++（字节）：0.1064
+    //     输入「算了，当我没说」 vs n5_search.examples
+    //         Python（码点）：0.0        C++（字节）：0.0556
+    // 纯中文输入下 Python 侧 sim 几乎恒为 0，C++ 侧却总有一堆字节级"撞车"，
+    // L1 打分因此系统性不同。实测在对照组 B0 的 seq=7 直接分叉：
+    // C++ 走 n3_tender、Python 走 n5_search（margin 只有 0.0045，被 0.023 的
+    // sim 差整个掀翻）。现把 C++ 对齐到码点切分，两侧打分才真正可比。
+    const std::vector<std::string> chars = utf8_chars(text);
+    std::vector<std::string> s;
+    s.reserve(chars.size());
+    for (const std::string& ch : chars) {
+        if (ch.size() == 1 && std::isspace(static_cast<unsigned char>(ch[0]))) continue;
+        std::string low = ch;
+        if (low.size() == 1)
+            low[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(low[0])));
+        s.push_back(low);
     }
     std::set<std::string> out;
-    if (s.size() < 2) { if (!s.empty()) out.insert(s); return out; }
-    // 对 UTF-8 中文，逐字节取二元组虽然会在多字节中间切分，
-    // 但作为**对称相似度度量**依然稳定有效，且免去了 ICU 依赖。
-    for (std::size_t i = 0; i + 1 < s.size(); ++i) out.insert(s.substr(i, 2));
+    if (s.size() < 2) { if (!s.empty()) out.insert(s.front()); return out; }
+    for (std::size_t i = 0; i + 1 < s.size(); ++i) out.insert(s[i] + s[i + 1]);
     return out;
 }
 

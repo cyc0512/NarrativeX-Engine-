@@ -9,7 +9,7 @@
 
 void printMainMenu() {
     std::cout << "\n=========================================\n";
-    std::cout << "        🌸ISOLATE 🌸\n";
+    std::cout << "        🌸 FS 🌸\n";
     std::cout << "=========================================\n";
     std::cout << "  1. 开始新游戏\n";
     std::cout << "  2. 读取已有存档\n";
@@ -29,7 +29,7 @@ int main() {
 
     // 构造失败必须显式暴露：以前这一步是静默的，后面一调用就 SIGSEGV。
     if (!engine.ready()) {
-        std::cerr << "\n【致命错误】" << engine.lastError() << "\n"
+        std::cerr << "\n【FS】致命错误：" << engine.lastError() << "\n"
                   << "请把工作目录切到 build/ 或项目根目录后重试。\n";
         return 1;
     }
@@ -62,7 +62,7 @@ int main() {
                 }
 
                 if (engine.isGameOver()) {
-                    std::cout << "\n【系统】游戏结束，返回主菜单。\n";
+                    std::cout << "\n【FS】游戏结束，返回主菜单。\n";
                     inGame = false;
                     break;
                 }
@@ -74,13 +74,13 @@ int main() {
                 std::getline(std::cin, userInput);
 
                 if (userInput == "退出" || userInput == "结束") {
-                    std::cout << "【系统】已保存进度，返回主菜单。\n";
+                    std::cout << "【FS】已保存进度，返回主菜单。\n";
                     inGame = false;
                     break;
                 }
 
                 if (security.checkSecurity(userInput)) {
-                    std::cout << "\033[31m【系统警告】检测到不文明用语，木子因委屈地低下了头...\n【好感度 -20】\033[0m\n";
+                    std::cout << "\033[31m【FS】系统警告：检测到不文明用语，木子因委屈地低下了头...\n【好感度 -20】\033[0m\n";
                     engine.applyPenalty(-20); 
                     continue; 
                 }
@@ -91,20 +91,20 @@ int main() {
         };
 
         if (choice == "1") {
-            std::cout << "\n【系统】请输入新玩家的名字: ";
+            std::cout << "\n【FS】请输入新玩家的名字: ";
             std::string playerName;
             std::getline(std::cin, playerName);
             engine.createNewPlayer(playerName); 
             enterGame(); 
         } 
         else if (choice == "2") {
-            std::cout << "\n【系统】请输入要读取的玩家名字: ";
+            std::cout << "\n【FS】请输入要读取的玩家名字: ";
             std::string playerName;
             std::getline(std::cin, playerName);
             if (engine.loadExistingPlayer(playerName)) {
                 enterGame(); 
             } else {
-                std::cout << "【系统】找不到该玩家的存档！\n";
+                std::cout << "【FS】找不到该玩家的存档！\n";
             }
         } 
         else if (choice == "3") {
@@ -121,10 +121,10 @@ int main() {
             std::string delName;
             std::getline(std::cin, delName);
             engine.deleteSaveData(delName);
-            std::cout << "【系统】删除操作完成。\n";
+            std::cout << "【FS】删除操作完成。\n";
         }
         else if (choice == "5") {
-            std::cout << "【系统】感谢游玩，再见！\n";
+            std::cout << "【FS】感谢游玩，再见！\n";
             isRunning = false;
         }
     }

@@ -1,6 +1,6 @@
 # NarrativeX / FluidStory —— 动态迷宫架构可行性评审
 
-> 评审对象：`isolate-galgame-server-main`（现有 C++17 + Qt5 + SQLite3 + libcurl 工程）
+> 评审对象：`fs`（现有 C++17 + Qt5 + SQLite3 + libcurl 工程；目录已由 `FluidStory` 统一改名为 `fs`）
 > 评审时间：2026-10-30
 > 评审方式：通读全部源码 + **实际运行验证**（23 项 Python 仿真 + 17 项 SQLite 约束测试 + C++ 内核编译与跨语言一致性比对）
 
@@ -297,7 +297,7 @@ ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000
 | 数据文件都不存在时 | 崩溃 | 打印 `【致命错误】剧本文件打开失败: ...` 并退出 |
 | ASan + UBSan | 报 null pointer / SEGV | **完全干净** |
 
-顺带确认：整个 Qt 工程在 **Ubuntu 22.04 + GCC 11 + Qt 5.15.3 + libcurl/openssl + libsqlite3** 下 `cmake` 配置通过、`nx_terminal` 与 `fluidstory` **两个目标均编译链接成功**，运行时中文显示正常、剧本加载正常、存档数据库连接正常（AI 那一步因未配置 API key 返回"（API内部报错）"，属预期）。
+顺带确认：整个 Qt 工程在 **Ubuntu 22.04 + GCC 11 + Qt 5.15.3 + libcurl/openssl + libsqlite3** 下 `cmake` 配置通过、`fs_terminal` 与 `fs` **两个目标均编译链接成功**，运行时中文显示正常、剧本加载正常、存档数据库连接正常（AI 那一步因未配置 API key 返回"（API内部报错）"，属预期）。
 
 ### P1 —— 影响稳定性与可维护性
 

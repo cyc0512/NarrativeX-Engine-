@@ -423,7 +423,7 @@ python reference/emit_trace.py > /tmp/exp.txt && \
 跑一遍验收流程，确认地基是稳的：
 
 ```bash
-cd isolate-galgame-server-main
+cd fs
 python reference/simulate.py            # 24/24
 python persistence/tests/test_store.py  # 17/17
 ```

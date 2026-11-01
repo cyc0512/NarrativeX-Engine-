@@ -1,0 +1,53 @@
+[driver] 目标：5 条自由输入，每条等待 5600 ms（> 5000 才能覆盖 5 秒定时器）
+【数据库】成功连接数据库: ../data/save.db
+[driver] 点击「开始新游戏」
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+[driver] 填写玩家名并确认
+[driver] #1 发送(len=0): 
+[driver] #2 发送(len=3):    
+[T03探针] 提交后台任务: idealThreadCount=2, poolMax=2
+[T03探针] worker 进入 processInput
+【系统】木子因正在思考中...
+【AI原始文本】 {"affinity_change": 2, "next_node": "", "reply": "哥哥，你回来了【中文测试】。我看到你口袋里露出一角，那是「发卡」吗？我有点在意……🌟🌙 不过还是先吃饭吧，菜要凉了。"}
+【后台数值变动】好感度: 2，当前: 92
+[T03探针] worker 退出 processInput
+[T03探针] AI 已返回，finished 回调 -> deleteLater, watcher=0x50300010f090
+[T03探针] 5s 定时器触发, watcher=0x50300010f090（裸指针，非空但可能已悬垂）
+[T03探针] 5s 时刻 QPointer 已失效(=对象已析构)? 是 —— 已析构，下面的访问就是解引用已释放内存
+[T03探针] 5s 定时器：isFinished() 为真（或读到的是已释放内存里的残留值），未做处理
+[driver] #3 发送(len=39): 我想看看你口袋里到底是什么
+[T03探针] 提交后台任务: idealThreadCount=2, poolMax=2
+[T03探针] worker 进入 processInput
+【系统】木子因正在思考中...
+【AI原始文本】 {"affinity_change": 2, "next_node": "", "reply": "哥哥，你回来了【中文测试】。我看到你口袋里露出一角，那是「发卡」吗？我有点在意……🌟🌙 不过还是先吃饭吧，菜要凉了。"}
+【后台数值变动】好感度: 2，当前: 94
+[T03探针] worker 退出 processInput
+[T03探针] AI 已返回，finished 回调 -> deleteLater, watcher=0x503000191a40
+[T03探针] 5s 定时器触发, watcher=0x503000191a40（裸指针，非空但可能已悬垂）
+[T03探针] 5s 时刻 QPointer 已失效(=对象已析构)? 是 —— 已析构，下面的访问就是解引用已释放内存
+[T03探针] 5s 定时器：isFinished() 为真（或读到的是已释放内存里的残留值），未做处理
+[driver] #4 发送(len=12): 😏🌟🌙
+[T03探针] 提交后台任务: idealThreadCount=2, poolMax=2
+[T03探针] worker 进入 processInput
+【系统】木子因正在思考中...
+【AI原始文本】 {"affinity_change": 2, "next_node": "", "reply": "哥哥，你回来了【中文测试】。我看到你口袋里露出一角，那是「发卡」吗？我有点在意……🌟🌙 不过还是先吃饭吧，菜要凉了。"}
+【后台数值变动】好感度: 2，当前: 96
+[T03探针] worker 退出 processInput
+[T03探针] AI 已返回，finished 回调 -> deleteLater, watcher=0x5030001e9f40
+[T03探针] 5s 定时器触发, watcher=0x5030001e9f40（裸指针，非空但可能已悬垂）
+[T03探针] 5s 时刻 QPointer 已失效(=对象已析构)? 是 —— 已析构，下面的访问就是解引用已释放内存
+[T03探针] 5s 定时器：isFinished() 为真（或读到的是已释放内存里的残留值），未做处理
+[driver] #5 发送(len=30): 。。。。。。。。。。
+[T03探针] 提交后台任务: idealThreadCount=2, poolMax=2
+[T03探针] worker 进入 processInput
+【系统】木子因正在思考中...
+【AI原始文本】 {"affinity_change": 2, "next_node": "", "reply": "哥哥，你回来了【中文测试】。我看到你口袋里露出一角，那是「发卡」吗？我有点在意……🌟🌙 不过还是先吃饭吧，菜要凉了。"}
+【后台数值变动】好感度: 2，当前: 98
+[T03探针] worker 退出 processInput
+[T03探针] AI 已返回，finished 回调 -> deleteLater, watcher=0x5030001ea5a0
+[T03探针] 5s 定时器触发, watcher=0x5030001ea5a0（裸指针，非空但可能已悬垂）
+[T03探针] 5s 时刻 QPointer 已失效(=对象已析构)? 是 —— 已析构，下面的访问就是解引用已释放内存
+[T03探针] 5s 定时器：isFinished() 为真（或读到的是已释放内存里的残留值），未做处理
+DRIVER_RESULT: sends=5/5  crash=0  (全部输入跑完，未崩溃)
+[driver] qt_main 返回 rc=0

@@ -59,7 +59,6 @@ public:
         for (auto& e : st.pending) {
             const NodeSpec* n = cat.find(e.node_id);
             if (n == nullptr) continue;                       // 节点被删除 -> 出池
-            if (e.awake) { alive.push_back(e); continue; }    // 已挽回，仅留档
 
             // ---- 防御性检查：游标不得回退（正常流程不可能，但读外部存档要防）----
             if (st.seq < e.birth_seq) {
@@ -68,8 +67,16 @@ public:
                     + " 超过了当前 time_cursor=" + std::to_string(st.seq)
                     + "，存档存在时空错乱，已拒绝继续");
             }
-            // 彻底过期 -> 销毁，不再占池
+            // ---- 彻底过期 -> 销毁，不再占池 ----
+            // 语义：redeem_expire 是"这件事在叙事上还能被提起多久"。
+            // 过期判定**必须排在 awake 判定之前**：一个被唤醒、但玩家始终没有
+            // 走上去的事件，同样应该过期销毁 —— 否则挂起池会无限增长（存档泄漏），
+            // 且"错过就是错过"不成立（对照组 B0 的 B-6 断言正是要证明这一点）。
+            // 旧实现把 awake 判定放在最前面，已唤醒条目会永久滞留；
+            // Python 参考实现则是唤醒即丢弃（留档丢失）。现两侧统一为
+            // "留档至过期为止"。
             if (st.seq - e.birth_seq > n->redeem_expire) continue;
+            if (e.awake) { alive.push_back(e); continue; }    // 已挽回，留档到过期为止
             // 同一步不允许自我唤醒：至少要隔一轮，避免"选了就立刻反悔"的抖动
             if (st.seq - e.birth_seq < 1) { alive.push_back(e); continue; }
 

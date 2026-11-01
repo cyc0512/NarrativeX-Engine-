@@ -1,0 +1,18 @@
+[driver] 目标：3 条自由输入，每条等待 5600 ms（> 5000 才能覆盖 5 秒定时器）
+【数据库】成功连接数据库: ../data/save.db
+[driver] 点击「开始新游戏」
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+[driver] 填写玩家名并确认
+[driver] R-04 校验：界面上「自由输入」入口数 = 0（去重后应为 1）
+[driver] #1 发送(len=0): 
+[driver] #2 发送(len=3):    
+【系统】木子因正在思考中...
+[driver] #3 发送(len=39): 我想看看你口袋里到底是什么
+【系统】木子因正在思考中...
+DRIVER_RESULT: sends=3/3  crash=0  (全部输入跑完，未崩溃)
+【AI原始文本】 ```json
+{"affinity_change": 5, "next_node": "", "reply": "哥哥，你总是这么好奇。其实没什么，只是些零钱和一张照片。这是我和朋友们的合照，一直放在这里，习惯了。"}
+```
+【后台数值变动】好感度: 5，当前: 95
+[driver] qt_main 返回 rc=0

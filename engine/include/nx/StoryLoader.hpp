@@ -182,6 +182,11 @@ public:
         b.routes = c.value("routes", b.routes);
         b.output = c.value("output", b.output);
         b.max_history_turns = c.value("max_history_turns", b.max_history_turns);
+        // 甲方硬约束 1200：剧本里配的 total_tokens 只能**收紧**，不能放大。
+        // 配成 2000 的剧本会被静默压回 1200，避免出现"配置说够了、实际超发"。
+        b.total_tokens = std::min(c.value("total_tokens", kMaxPromptTokens),
+                                  kMaxPromptTokens);
+        if (b.total_tokens < 1) b.total_tokens = kMaxPromptTokens;
         return b;
     }
 
@@ -201,6 +206,10 @@ public:
             for (const auto& o : n.options) bad("options.next", o.next);
             if (n.redeemable && n.redeem_expire <= 0)
                 errs.push_back("节点 " + n.id + " redeemable=true 但 redeem_expire<=0，永不可能挽回");
+            // R-10：可挽回节点必须带挽回变体，否则唤醒时会回放旧台词（违反硬约束 C2）。
+            if (n.redeemable && !n.redeem_variant.has)
+                errs.push_back("节点 " + n.id + " redeemable=true 但缺少 presentation.redeem_variant"
+                               "（挽回时会回放旧台词，违反硬约束 C2）");
             if (n.intent.description.empty() && n.kind != NodeKind::Fallback)
                 errs.push_back("节点 " + n.id + " 缺少 intent.description，AI 将无法判断这条路通向什么");
         }
@@ -262,6 +271,15 @@ private:
             n.npc_text  = opt_str(p, "npc_text");
             n.npc_state = opt_str(p, "npc_state");
             n.hint      = opt_str(p, "hint");
+            if (p.contains("redeem_variant") && p["redeem_variant"].is_object()) {
+                const Json& rv = p["redeem_variant"];
+                n.redeem_variant.narrator  = opt_str(rv, "narrator");
+                n.redeem_variant.npc_text  = opt_str(rv, "npc_text");
+                n.redeem_variant.npc_state = opt_str(rv, "npc_state");
+                n.redeem_variant.has = !n.redeem_variant.narrator.empty()
+                                    || !n.redeem_variant.npc_text.empty()
+                                    || !n.redeem_variant.npc_state.empty();
+            }
         }
         if (raw.contains("options") && raw["options"].is_array())
             for (const auto& o : raw["options"]) {

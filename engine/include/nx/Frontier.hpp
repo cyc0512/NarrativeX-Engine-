@@ -182,8 +182,24 @@ public:
         std::vector<NodeId> cand = cat.candidate_ids(st.tags, st.items, st.current_node);
 
         // 挂起池里的节点必须参与召回，否则"挽回"永远轮不到它们。
+        //
+        // ⚠ **已唤醒（awake）的条目同样要召回** —— 它只是"重新变得可达"，
+        //   玩家还没有真正走进去。此前这里写成 `if (!p.awake)`，导致一个刚被
+        //   后向指针唤醒、但 requires 里带**永不被满足的 tag 依赖**的节点
+        //   （本例是 n5_search 的 `{any:[{step_gte:1},{tag:"suspicious"}]}`）
+        //   会立刻从候选集里消失 —— 刚被救回来又当场变回不可达。
+        //   这是对照组 B0 在 C++ 侧与 Python 侧走出不同分支的根因
+        //   （C++ step7 走 n3_tender，Python 走 n5_search）。
+        //   Python 参考实现（Catalog::candidate_ids）用 set 收集全部 pending，
+        //   没有这个过滤；现把 C++ 对齐过去。
         for (const auto& p : st.pending)
-            if (!p.awake && cat.find(p.node_id) != nullptr) cand.push_back(p.node_id);
+            if (cat.find(p.node_id) != nullptr) cand.push_back(p.node_id);
+
+        // 去重 + 定序：pending 与 index.always / neighbors 可能重叠，不去重会让
+        // 同一个节点在 Frontier 里出现两次（Python 侧用 set 天然去重，两侧必须一致）。
+        // 顺带把 unordered_set 的任意迭代序收敛成确定的字典序，便于跨语言 diff。
+        std::sort(cand.begin(), cand.end());
+        cand.erase(std::unique(cand.begin(), cand.end()), cand.end());
 
         FrontierView view;
         for (const auto& id : cand) {
