@@ -102,8 +102,7 @@ int RunCase(GameEngine& engine, const char* label, const std::string& freeInput)
 
 int main() {
     std::printf("=== R-02 端到端中文验证（真实 HTTP + 真实 AiEngine + 真实 GameEngine）===\n");
-
-    GameEngine engine("../data/story.json");
+    EngineAdapter engine("../data/story_v2.json");
     if (!engine.ready()) {
         std::printf("FATAL 引擎构造失败: %s\n", engine.lastError().c_str());
         return 2;

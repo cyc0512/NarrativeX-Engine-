@@ -2,10 +2,9 @@
 #include <string>
 #include <limits>
 #include <vector>
-#include <termios.h> 
-#include <unistd.h>  
-#include "GameEngine.h"
-#include "SecurityFilter.h"
+#include <termios.h>
+#include <unistd.h>
+#include "EngineAdapter.h"
 
 void printMainMenu() {
     std::cout << "\n=========================================\n";
@@ -24,10 +23,8 @@ int main() {
     struct termios oldt, newt;
     tcgetattr(STDIN_FILENO, &oldt);
 
-    GameEngine engine("../data/story.json");
-    SecurityFilter security;
+   EngineAdapter engine("../data/story_v2.json");
 
-    // 构造失败必须显式暴露：以前这一步是静默的，后面一调用就 SIGSEGV。
     if (!engine.ready()) {
         std::cerr << "\n【FS】致命错误：" << engine.lastError() << "\n"
                   << "请把工作目录切到 build/ 或项目根目录后重试。\n";
@@ -35,7 +32,7 @@ int main() {
     }
 
     bool isRunning = true;
-    
+
     while (isRunning) {
         printMainMenu();
         std::string choice;
@@ -45,7 +42,7 @@ int main() {
             bool inGame = true;
             while (inGame) {
                 std::vector<std::string> pages = engine.getCurrentNodePages();
-                
+
                 newt = oldt;
                 newt.c_lflag &= ~(ICANON | ECHO);
                 tcsetattr(STDIN_FILENO, TCSANOW, &newt);
@@ -53,12 +50,12 @@ int main() {
                 for (const auto& page : pages) {
                     std::cout << "\n" << page;
                     std::cout << "\033[90m(按空格键继续...)\033[0m";
-                    
-                    char ch = std::cin.get(); 
+
+                    char ch = std::cin.get();
                     while (ch != ' ') {
                         ch = std::cin.get();
                     }
-                    std::cout << "\n"; 
+                    std::cout << "\n";
                 }
 
                 if (engine.isGameOver()) {
@@ -79,14 +76,11 @@ int main() {
                     break;
                 }
 
-                if (security.checkSecurity(userInput)) {
-                    std::cout << "\033[31m【FS】系统警告：检测到不文明用语，木子因委屈地低下了头...\n【好感度 -20】\033[0m\n";
-                    engine.applyPenalty(-20); 
-                    continue; 
-                }
+                // 敏感词拦截已移除：所有输入直接进入引擎（由 AI / 剧本路由处理）
 
                 std::string reply = engine.processInput(userInput);
                 std::cout << "\033[32m" << reply << "\033[0m\n";
+                std::cout << "\033[90m[当前节点: " << engine.getCurrentNode() << "]\033[0m\n";
             }
         };
 
@@ -94,21 +88,20 @@ int main() {
             std::cout << "\n【FS】请输入新玩家的名字: ";
             std::string playerName;
             std::getline(std::cin, playerName);
-            engine.createNewPlayer(playerName); 
-            enterGame(); 
-        } 
+            engine.createNewPlayer(playerName);
+            enterGame();
+        }
         else if (choice == "2") {
             std::cout << "\n【FS】请输入要读取的玩家名字: ";
             std::string playerName;
             std::getline(std::cin, playerName);
             if (engine.loadExistingPlayer(playerName)) {
-                enterGame(); 
+                enterGame();
             } else {
                 std::cout << "【FS】找不到该玩家的存档！\n";
             }
-        } 
+        }
         else if (choice == "3") {
-            // 👇 终端版直接调用 getAllSaves 打印
             auto saves = engine.getAllSaves();
             std::cout << "\n--- 存档列表 ---\n";
             for (const auto& s : saves) {

@@ -39,7 +39,7 @@
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
-    GameEngine engine("../data/story.json");
+   EngineAdapter engine("../data/story_v2.json");
     SecurityFilter security;
 
     // 构造失败必须显式暴露：以前是静默的，随后任何数据库操作都会 SIGSEGV。

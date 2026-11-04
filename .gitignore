@@ -1,4 +1,22 @@
+# 构建产物
 build/
+
+# 私有配置（含 api_key）
 private/
-.vscode-server/
 config.json
+
+# 数据库（含玩家存档）
+*.db
+data/save.db
+
+# 编辑器 / 远程
+.vscode/
+.vscode-server/
+.idea/
+*.swp
+*~
+
+# 临时测试产物
+test_story
+*.o
+*.out

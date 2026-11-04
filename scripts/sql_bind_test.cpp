@@ -108,7 +108,7 @@ int RunDirect() {
 
 int RunEngine(const std::string& dbPathForCheck) {
     std::printf("=== R-11 B：走 GameEngine 全链路（新建/保存/读取/删除）===\n");
-    GameEngine engine("../data/story.json");
+    EngineAdapter engine("../data/story_v2.json");
     if (!engine.ready()) {
         std::printf("    [NG] 引擎构造失败: %s\n", engine.lastError().c_str());
         return g_fails + 1;

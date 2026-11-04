@@ -2,6 +2,7 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QLayoutItem>
 #include <QLabel>
 #include <QPushButton>
 #include <QLineEdit>
@@ -21,18 +22,15 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include "GameEngine.h"
-#include "SecurityFilter.h"
+#include "EngineAdapter.h"
 #include <QtConcurrent>
 #include <QFutureWatcher>
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
-    GameEngine engine("../data/story.json");
-    SecurityFilter security;
+    EngineAdapter engine("../data/story_v2.json");
 
-    // 构造失败必须显式暴露：以前是静默的，随后任何数据库操作都会 SIGSEGV。
     if (!engine.ready()) {
         QMessageBox::critical(nullptr, "FS · 启动失败",
                               QString::fromStdString(engine.lastError()) +
@@ -42,10 +40,9 @@ int main(int argc, char *argv[]) {
 
     QWidget window;
     window.setWindowTitle("FS · FluidStory");
-    window.resize(1000, 700); 
+    window.resize(1000, 700);
     window.setStyleSheet("background-color: #1a1a1a;");
 
-    // 背景图
     QLabel *bgLabel = new QLabel(&window);
     bgLabel->setGeometry(0, 0, 1000, 700);
     QImage bgImage("../assets/bg.jpg");
@@ -123,33 +120,34 @@ int main(int argc, char *argv[]) {
     // 页面 2：游戏界面
     // ==========================================
     QWidget *gamePage = new QWidget();
-    
+
     QLabel *dialogBox = new QLabel(gamePage);
-    dialogBox->setGeometry(50, 250, 900, 350); 
-    dialogBox->setFont(QFont("Microsoft YaHei", 20)); 
+    dialogBox->setGeometry(50, 100, 900, 450);
+    dialogBox->setFont(QFont("Microsoft YaHei", 18));
     dialogBox->setStyleSheet("background-color: rgba(0, 0, 0, 180); color: white; border-radius: 15px; padding: 30px; border: 2px solid #34495e;");
     dialogBox->setWordWrap(true);
-    dialogBox->setAlignment(Qt::AlignTop | Qt::AlignLeft); 
+    dialogBox->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 
-    QWidget *optionsWidget = new QWidget(gamePage);
-    optionsWidget->setGeometry(250, 450, 500, 180); 
-    optionsWidget->setStyleSheet("background: transparent;");
-    QVBoxLayout *optionsLayout = new QVBoxLayout(optionsWidget);
+    QWidget *optionsContainer = new QWidget(gamePage);
+    optionsContainer->setStyleSheet("background: transparent;");
+    optionsContainer->setGeometry(50, 560, 900, 150);
+    QVBoxLayout *optionsLayout = new QVBoxLayout(optionsContainer);
     optionsLayout->setContentsMargins(0, 0, 0, 0);
-    optionsWidget->hide();
+    optionsLayout->setSpacing(10);
+    optionsContainer->hide();
 
     QWidget *inputWidget = new QWidget(gamePage);
-    inputWidget->setGeometry(50, 620, 900, 50);
+    inputWidget->setGeometry(50, 630, 900, 50);
     QHBoxLayout *inputLayout = new QHBoxLayout(inputWidget);
     inputLayout->setContentsMargins(0, 0, 0, 0);
 
     QLineEdit *inputBox = new QLineEdit(inputWidget);
     inputBox->setFont(QFont("Microsoft YaHei", 16));
     inputBox->setStyleSheet("background-color: rgba(255, 255, 255, 230); border-radius: 8px; padding: 5px 10px;");
-    
+
     QPushButton *sendBtn = new QPushButton("发送", inputWidget);
     sendBtn->setStyleSheet("background-color: #e74c3c; color: white; font-size: 16px; font-weight: bold; padding: 8px 20px; border-radius: 8px;");
-    
+
     inputLayout->addWidget(inputBox);
     inputLayout->addWidget(sendBtn);
     inputWidget->hide();
@@ -164,7 +162,7 @@ int main(int argc, char *argv[]) {
     QMenu *systemMenu = new QMenu();
     QAction *saveAction = systemMenu->addAction("保存进度");
     QAction *backToMenuAction = systemMenu->addAction("返回主菜单");
-    
+
     QObject::connect(sysMenuBtn, &QPushButton::clicked, [&, systemMenu, sysMenuBtn]() {
         systemMenu->exec(sysMenuBtn->mapToGlobal(QPoint(0, sysMenuBtn->height())));
     });
@@ -175,22 +173,21 @@ int main(int argc, char *argv[]) {
     });
 
     QObject::connect(backToMenuAction, &QAction::triggered, [&]() {
-        engine.applyPenalty(0); 
+        engine.applyPenalty(0);
         stackedWidget->setCurrentWidget(mainMenuPage);
     });
 
-    // ==========================================
-    // 自由输入的**唯一**唤起入口（R-04）
-    //
-    // 以前有两个入口同时存在：
-    //   ① 剧本 data/story.json 里写死的那个选项「3. 【自由输入】我想自己说点什么...」，
-    //      它走的是"选项按钮"的分支，点了就唤起输入框；
-    //   ② 代码里 hasIntent 为真时又强制生成的一个「【自由输入】对她说点什么...」按钮。
-    // 甲方看到的"两个自由输入"就是这么来的。
-    // 处置：剧本里那个选项删掉（自由输入是引擎能力，不该写成剧本选项），
-    //      代码里只留下面这一个 showInput()，所有唤起路径都走它。
-    // ==========================================
+    stackedWidget->addWidget(mainMenuPage);
+    stackedWidget->addWidget(gamePage);
+    stackedWidget->setCurrentWidget(mainMenuPage);
+
     std::function<void()> showInput;
+    std::function<void()> refreshUI;
+    std::function<void()> refreshLoadPanel;
+    int currentPageIndex = 0;
+    std::vector<std::string> currentPagesCache;
+    bool aiInFlight = false;
+
     showInput = [&]() {
         inputWidget->show();
         inputBox->setFocus();
@@ -200,18 +197,13 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    // ==========================================
-    // 核心逻辑：刷新界面
-    // ==========================================
-    std::function<void()> refreshUI;
     refreshUI = [&]() {
         QLayoutItem *item;
         while ((item = optionsLayout->takeAt(0)) != nullptr) {
             if (item->widget()) item->widget()->deleteLater();
             delete item;
         }
-
-        optionsWidget->hide();
+        optionsContainer->hide();
         inputWidget->hide();
 
         if (engine.isGameOver()) {
@@ -221,70 +213,89 @@ int main(int argc, char *argv[]) {
 
         std::vector<std::string> pages = engine.getCurrentNodePages();
         if (pages.empty()) return;
-        dialogBox->setText(QString::fromStdString(pages[0])); 
 
-        std::vector<std::string> currentOpts = engine.getCurrentOptions();
-        bool hasIntent = engine.hasIntentNodes(); // 引擎提供的全新判断接口
-        
-        if (currentOpts.empty() && !hasIntent) {
-            // 纯文本节点，没有任何操作，显示继续
-            optionsWidget->show();
+        if (currentPageIndex == 0 || pages[0] != currentPagesCache[0]) {
+            currentPagesCache = pages;
+            currentPageIndex = 0;
+        }
+
+        dialogBox->setText(QString::fromStdString(currentPagesCache[currentPageIndex]));
+
+        if (currentPageIndex < currentPagesCache.size() - 1) {
             QPushButton *continueBtn = new QPushButton("点击继续...", gamePage);
+            continueBtn->setGeometry(350, 580, 300, 50);
             continueBtn->setStyleSheet(
-                "QPushButton { background-color: rgba(52, 152, 219, 220); color: white; padding: 12px 20px; border-radius: 10px; font-size: 16px; font-weight: bold; }"
+                "QPushButton { background-color: rgba(52, 152, 219, 220); color: white; border-radius: 10px; font-size: 18px; font-weight: bold; }"
                 "QPushButton:hover { background-color: rgba(41, 128, 185, 255); }"
             );
-            optionsLayout->addWidget(continueBtn);
-            
+            continueBtn->show();
+
+            QObject::connect(continueBtn, &QPushButton::clicked, [&, continueBtn]() {
+                continueBtn->deleteLater();
+                currentPageIndex++;
+                refreshUI();
+            });
+            return;
+        }
+
+        optionsContainer->show();
+        optionsContainer->raise();
+
+        std::vector<std::string> currentOpts = engine.getCurrentOptions();
+
+        if (currentOpts.empty()) {
+            QPushButton *continueBtn = new QPushButton("点击继续...", gamePage);
+            continueBtn->setFixedSize(300, 50);
+            continueBtn->setStyleSheet(
+                "QPushButton { background-color: rgba(52, 152, 219, 220); color: white; border-radius: 10px; font-size: 16px; font-weight: bold; }"
+                "QPushButton:hover { background-color: rgba(41, 128, 185, 255); }"
+            );
+            optionsLayout->addWidget(continueBtn, 0, Qt::AlignCenter);
+
             QObject::connect(continueBtn, &QPushButton::clicked, [&]() {
-                engine.processInput(" "); 
+                engine.advance();
+                currentPageIndex = 0;
                 refreshUI();
             });
         } else {
-            optionsWidget->show();
-            
-            // 1. 渲染 JSON 里的固定选项
+            int count = currentOpts.size();
+            int h = count * 55;
+            optionsContainer->setGeometry(100, 550 - h + 50, 800, h);
+
+            // 1. 固定选项（只做跳转，不判断"自由输入"）
             for (size_t i = 0; i < currentOpts.size(); ++i) {
                 QString btnText = QString::fromStdString(currentOpts[i]);
                 QPushButton *btn = new QPushButton(btnText, gamePage);
-                
+                btn->setFixedSize(800, 45);
                 btn->setStyleSheet(
-                    "QPushButton { background-color: rgba(30, 30, 30, 200); color: #ecf0f1; padding: 12px 20px; border-radius: 10px; border: 1px solid #7f8c8d; text-align: left; font-family: 'Microsoft YaHei'; font-size: 16px; }"
+                    "QPushButton { background-color: rgba(30, 30, 30, 200); color: #ecf0f1; padding: 10px 20px; border-radius: 10px; border: 1px solid #7f8c8d; text-align: left; font-family: 'Microsoft YaHei'; font-size: 16px; }"
                     "QPushButton:hover { background-color: rgba(52, 152, 219, 220); border: 1px solid #3498db; }"
                 );
                 optionsLayout->addWidget(btn);
-                
-                // 固定选项一律走 processInput(序号)，不再做文本特征猜测。
-                // ⚠️ 旧代码这里有一段"按钮文字含 自由输入 **或者** 含 3. 就当自由输入入口"的特判。
-                //    后半条是给旧剧本擦屁股的：任何文字里带 "3." 的选项都会被误判成自由输入。
-                //    R-04 删掉剧本里那个写死的自由输入选项后它已无匹配对象，
-                //    只剩误伤，故整段特判删除 —— 自由输入入口只保留下面 hasIntent 那一处。
+
                 QObject::connect(btn, &QPushButton::clicked, [&, i]() {
                     engine.processInput(std::to_string(i + 1));
+                    currentPageIndex = 0;
                     refreshUI();
                 });
             }
 
-            // 2. 强制生成自由输入按钮（如果该节点有隐藏 AI 分支）
-            if (hasIntent) {
-                QPushButton *btn = new QPushButton("【自由输入】对她说点什么...", gamePage);
-                btn->setStyleSheet(
-                    "QPushButton { background-color: rgba(230, 126, 34, 200); color: white; padding: 12px 20px; border-radius: 10px; border: 1px solid #e67e22; text-align: left; font-family: 'Microsoft YaHei'; font-size: 16px; font-weight: bold; }"
+            // 2. 自由输入独立入口（由 NodeSpec.intent 判断，不猜文本）
+            if (engine.isFreeInputAvailable()) {
+                QPushButton *freeBtn = new QPushButton("【自由输入】对她说点什么...", gamePage);
+                freeBtn->setFixedSize(800, 45);
+                freeBtn->setStyleSheet(
+                    "QPushButton { background-color: rgba(230, 126, 34, 200); color: white; padding: 10px 20px; border-radius: 10px; border: 1px solid #e67e22; text-align: left; font-family: 'Microsoft YaHei'; font-size: 16px; font-weight: bold; }"
                     "QPushButton:hover { background-color: rgba(211, 84, 0, 255); }"
                 );
-                optionsLayout->addWidget(btn);
-
-                QObject::connect(btn, &QPushButton::clicked, [&]() {
+                optionsLayout->addWidget(freeBtn);
+                QObject::connect(freeBtn, &QPushButton::clicked, [&]() {
                     showInput();
                 });
             }
         }
     };
 
-    // ==========================================
-    // 刷新存档面板
-    // ==========================================
-    std::function<void()> refreshLoadPanel;
     refreshLoadPanel = [&]() {
         QLayoutItem *item;
         while ((item = slotsLayout->takeAt(0)) != nullptr) {
@@ -301,18 +312,18 @@ int main(int argc, char *argv[]) {
 
             if (i < saves.size()) {
                 DatabaseManager::SaveInfo info = saves[i];
-                
+
                 QPushButton *loadBtn = new QPushButton(slotWidget);
                 loadBtn->setGeometry(0, 0, 600, 80);
                 loadBtn->setStyleSheet("QPushButton { background: transparent; border-radius: 8px; } QPushButton:hover { background-color: #3498db; }");
-                
+
                 QVBoxLayout *slotLayout = new QVBoxLayout(loadBtn);
                 slotLayout->setContentsMargins(20, 10, 20, 10);
                 slotLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
-                QLabel *line1 = new QLabel(QString::fromStdString("玩家: " + info.playerName + "  |  好感度: " + std::to_string(info.affinity)), loadBtn);
+                QLabel *line1 = new QLabel(QString::fromStdString("玩家: " + info.playerName + "  |  节点: " + info.currentNode), loadBtn);
                 line1->setStyleSheet("color: white; font-size: 18px; font-weight: bold; background: transparent;");
-                
+
                 QString timeStr = QString::fromStdString(info.lastLogin);
                 if (timeStr.trimmed().isEmpty()) timeStr = "时间读取失败";
 
@@ -321,7 +332,7 @@ int main(int argc, char *argv[]) {
 
                 slotLayout->addWidget(line1);
                 slotLayout->addWidget(line2);
-                
+
                 QObject::connect(loadBtn, &QPushButton::clicked, [&, info]() {
                     if (engine.loadExistingPlayer(info.playerName)) {
                         refreshUI();
@@ -333,12 +344,12 @@ int main(int argc, char *argv[]) {
                 QPushButton *delBtn = new QPushButton("X", slotWidget);
                 delBtn->setGeometry(560, 5, 30, 30);
                 delBtn->setStyleSheet("QPushButton { background-color: #e74c3c; color: white; border-radius: 15px; font-weight: bold; } QPushButton:hover { background-color: #c0392b; }");
-                
+
                 QObject::connect(delBtn, &QPushButton::clicked, [&, info]() {
                     QMessageBox::StandardButton reply = QMessageBox::question(&window, "FS · 删除存档", "确定要删除这个存档吗？", QMessageBox::Yes | QMessageBox::No);
                     if (reply == QMessageBox::Yes) {
                         engine.deleteSaveData(info.playerName);
-                        refreshLoadPanel(); 
+                        refreshLoadPanel();
                     }
                 });
 
@@ -353,14 +364,6 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    // ==========================================
-    // 发送按钮及多线程逻辑 (原生安全版)
-    // ==========================================
-    // 同一时刻只允许一个 AI 请求在飞。
-    // 旧代码在 5 秒超时后就把发送按钮重新点亮，可后台的 processInput 还在跑，
-    // 玩家再点一次就会有**两个线程同时写同一个 GameEngine 和同一个 sqlite 连接**（D-6）。
-    bool aiInFlight = false;
-
     QObject::connect(sendBtn, &QPushButton::clicked, [&]() {
         QString text = inputBox->text();
         if (text.isEmpty()) return;
@@ -371,58 +374,23 @@ int main(int argc, char *argv[]) {
             return;
         }
 
-        if (security.checkSecurity(text.toStdString())) {
-            QMessageBox::warning(&window, "FS · 警告", "检测到不文明用语！");
-            engine.applyPenalty(-20);
-            inputBox->clear();
-            inputWidget->hide();
-            refreshUI(); 
-            return;
-        }
-        
         inputBox->clear();
         inputWidget->hide();
-        
+
         dialogBox->setText("木子因正在思考中......");
         sendBtn->setDisabled(true);
 
-        std::string nodeBeforeSend = engine.getCurrentNode();
-
-        // ==================================================================
-        // 异步 AI 请求（R-03 / D-4 修复）
-        //
-        // 【旧实现的致命缺陷】finished 回调里调了 watcher->deleteLater()，watcher
-        // 在 AI 返回后约几百毫秒内就被析构；而下面那个 5 秒 QTimer::singleShot
-        // **没有绑 context object，到点照样会响**。于是 5 秒时 watcher 已经是个
-        // 非空但悬垂的指针，`if (watcher && ...)` 拦不住它，
-        // `watcher->isFinished()` 就成了对已释放内存的解引用（heap-use-after-free）。
-        // 实测：AI 比 5 秒快时 3/3 SIGSEGV；AI 比 5 秒慢时 3/3 不崩。
-        //
-        // 【修法】四条一起上，缺一条都会留缝：
-        //   1) QPointer 持有 watcher —— 对象一被析构它立刻变 null，可判空；
-        //      （裸指针做不到这件事，它永远"非空"）
-        //   2) shared_ptr<bool> done 把"已经对玩家兑现过一次"从
-        //      "对象还活着吗"里解耦出来，两条路径抢占，后到的直接退出；
-        //   3) QTimer 交给 &window 托管 —— window 没了定时器自动停表，
-        //      不会再打出无主的回调；
-        //   4) 两条路径互相判空（isNull()），绝不碰可能已被析构的对象。
-        // ==================================================================
         auto done = std::make_shared<bool>(false);
 
         QTimer* timeoutTimer = new QTimer(&window);
         timeoutTimer->setSingleShot(true);
-        // 定时器同样要用 QPointer 持有：超时路径会把它 deleteLater()，
-        // 而慢速 AI 的结果 8 秒后才回来，那时 finished 路径若再对同一个
-        // 定时器调 stop()/deleteLater() 就是 UAF（我第一版修复就踩了这个坑，
-        // 实测慢路径直接 SIGSEGV）。
         QPointer<QTimer> timerGuard(timeoutTimer);
 
-        QFutureWatcher<std::string>* watcher = new QFutureWatcher<std::string>(&window);
-        QPointer<QFutureWatcher<std::string>> watcherGuard(watcher);
+        QFutureWatcher<StepResult>* watcher = new QFutureWatcher<StepResult>(&window);
+        QPointer<QFutureWatcher<StepResult>> watcherGuard(watcher);
 
-        QObject::connect(watcher, &QFutureWatcher<std::string>::finished,
-                         [&, watcherGuard, timerGuard, done, nodeBeforeSend]() {
-            // AI 正常返回：无论如何都要把按钮还给玩家，这是唯一的复位点。
+        QObject::connect(watcher, &QFutureWatcher<StepResult>::finished,
+                         [&, watcherGuard, timerGuard, done]() {
             *done = true;
             aiInFlight = false;
 
@@ -433,15 +401,16 @@ int main(int argc, char *argv[]) {
 
             if (watcherGuard.isNull()) return;
 
-            std::string aiText = engine.getLastAiReply();
-            if (aiText.empty()) aiText = "（木子因似乎陷入了沉默）";
+            StepResult sr = watcherGuard->result();
+            QString reply = QString::fromStdString(sr.reply);
+            if (reply.isEmpty()) reply = "（木子因似乎陷入了沉默）";
 
-            dialogBox->setText(QString::fromStdString(aiText));
+            dialogBox->setText(reply);
             sendBtn->setDisabled(false);
 
-            std::string nodeAfterSend = engine.getCurrentNode();
-            if (nodeBeforeSend != nodeAfterSend) {
-                refreshUI();
+            if (sr.moved) {
+                currentPageIndex = 0;
+                QTimer::singleShot(600, [&]() { refreshUI(); });
             } else {
                 inputWidget->show();
                 inputBox->setFocus();
@@ -450,55 +419,46 @@ int main(int argc, char *argv[]) {
             watcherGuard->deleteLater();
         });
 
-        // 5 秒超时保护：定时器由 &window 托管，window 析构时自动停表。
         QObject::connect(timeoutTimer, &QTimer::timeout,
                          [&, timerGuard, done]() {
-            if (*done) return;   // AI 已经兑现过了，这次只是空转
+            if (*done) return;
             *done = true;
 
             dialogBox->setText("（木子因似乎陷入了长久的沉默，没有回应。）");
             inputWidget->show();
             inputBox->setFocus();
             if (!timerGuard.isNull()) timerGuard->deleteLater();
-            // ⚠️ 这里**故意不** disconnect / delete watcher：后台的 processInput
-            //    可能还在跑，留着它，等结果回来时由 finished 路径统一收尾，
-            //    同时 aiInFlight 保持为 true，避免同一时间跑两个 processInput。
         });
 
         aiInFlight = true;
         timeoutTimer->start(5000);
 
-        // 启动后台线程执行 engine.processInput
-        QFuture<std::string> future = QtConcurrent::run([&, text]() {
-            return engine.processInput(text.toStdString());
+        QFuture<StepResult> future = QtConcurrent::run([&, text]() {
+            return engine.step(text.toStdString());
         });
         watcher->setFuture(future);
     });
 
-    // ==========================================
-    // 页面与主菜单绑定
-    // ==========================================
-    stackedWidget->addWidget(mainMenuPage);
-    stackedWidget->addWidget(gamePage);
-    stackedWidget->setCurrentWidget(mainMenuPage);
+    QObject::connect(inputBox, &QLineEdit::returnPressed, sendBtn, &QPushButton::click);
 
     QObject::connect(startBtn, &QPushButton::clicked, [&]() {
         bool ok;
         QString name = QInputDialog::getText(&window, "新游戏", "请输入你的名字:", QLineEdit::Normal, "", &ok);
         if (!ok || name.isEmpty()) return;
-        
+
         engine.createNewPlayer(name.toStdString());
+        currentPageIndex = 0;
         stackedWidget->setCurrentWidget(gamePage);
-        refreshUI(); 
+        refreshUI();
     });
 
     QObject::connect(openLoadPanelBtn, &QPushButton::clicked, [&]() {
-        refreshLoadPanel(); 
-        loadPanel->show();  
+        refreshLoadPanel();
+        loadPanel->show();
     });
 
     QObject::connect(closePanelBtn, &QPushButton::clicked, [&]() {
-        loadPanel->hide(); 
+        loadPanel->hide();
     });
 
     QObject::connect(quitBtn, &QPushButton::clicked, [&]() {

@@ -6,35 +6,31 @@
 
 // 数据访问层。
 //
-// R-11 修复要点（本次改动的全部动机）：
-//   1. 所有带玩家输入的 SQL 一律走 sqlite3_prepare_v2 + sqlite3_bind_*，
-//      不再用字符串拼接。旧代码把 playerName 直接拼进 VALUES ('" + name + "')，
-//      于是 O'Brien 会让整条 INSERT 语法错误 → sqlite3_exec 返回错误 → 错误被完全忽略
-//      → 玩家点了保存、以为存上了，实际一行都没写进去（静默丢档）。
-//   2. sqlite3_column_text() 在列为 NULL 时返回 nullptr，
-//      旧代码 `std::string(reinterpret_cast<const char*>(...))` 在 NULL 上是未定义行为
-//      （实测 SIGSEGV）。这里统一走 columnText()，NULL 一律当空串。
-//   3. 任何一步失败都**说出来**。旧代码的最大问题不是会被注入，
-//      而是失败了还不吭声，让上层以为成功了。
+// R-11 修复要点：
+//   1. 所有带玩家输入的 SQL 一律走 sqlite3_prepare_v2 + sqlite3_bind_*，不拼接。
+//   2. sqlite3_column_text() 在列为 NULL 时返回 nullptr，统一走 columnText()。
+//   3. 任何一步失败都**说出来**，返回 bool，让上层知道。
+//
+// 迁移新增（第 2 批）：
+//   4. player_save 加 state_json 列，存 nx::GameState 全量 JSON
+//      （seq / pending / rng_state 等旧表存不下的字段）。
+//   5. saveStateJson / loadStateJson：新档走全量 JSON；
+//      旧档 state_json 为 NULL 时，loadStateJson 返回空串，
+//      由上层回退到 loadData（current_node + affinity）。
 class DatabaseManager {
 private:
     sqlite3* db;
 
-    // 统一的失败上报点。detail 为 nullptr 时取 sqlite3_errmsg。
     void reportError(const char* where, const char* detail = nullptr) {
         std::cerr << "【数据库错误】" << where << " 失败: "
                   << (detail ? detail : sqlite3_errmsg(db)) << std::endl;
     }
 
-    // NULL 安全的文本列读取。
-    // ⚠️ 绝不能把 sqlite3_column_text() 的返回值直接喂给 std::string：
-    //    列为 NULL 时它是 nullptr，std::string(nullptr) 是未定义行为（崩溃候选之五）。
     static std::string columnText(sqlite3_stmt* stmt, int col) {
         const unsigned char* p = sqlite3_column_text(stmt, col);
         return p ? std::string(reinterpret_cast<const char*>(p)) : std::string();
     }
 
-    // 不带参数的 DDL / 维护性 SQL（无外部输入，无需绑定）。
     bool execSql(const char* where, const char* sql) {
         char* errMsg = nullptr;
         if (sqlite3_exec(db, sql, nullptr, nullptr, &errMsg) != SQLITE_OK) {
@@ -45,12 +41,29 @@ private:
         return true;
     }
 
+    // 判断表是否有某列（用于迁移）
+    bool hasColumn(const char* table, const char* column) {
+        std::string sql = std::string("PRAGMA table_info(") + table + ");";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            reportError("hasColumn(prepare)");
+            return false;
+        }
+        bool found = false;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            if (columnText(stmt, 1) == column) { found = true; break; }
+        }
+        sqlite3_finalize(stmt);
+        return found;
+    }
+
 public:
     struct SaveInfo {
         std::string playerName;
         int affinity;
         std::string currentNode;
         std::string lastLogin;
+        bool hasStateJson = false;   // 新档标记（第 2 批新增，UI 可选展示）
     };
 
     DatabaseManager(const std::string& dbPath) {
@@ -78,32 +91,28 @@ public:
                 "current_node TEXT, "
                 "last_login DATETIME DEFAULT CURRENT_TIMESTAMP);");
 
-        // 2. 检查并迁移旧表（PRAGMA 无外部输入，直接 prepare 即可）
-        bool hasLastLogin = false;
-        const char* checkSql = "PRAGMA table_info(player_save);";
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(db, checkSql, -1, &stmt, nullptr) == SQLITE_OK) {
-            while (sqlite3_step(stmt) == SQLITE_ROW) {
-                if (columnText(stmt, 1) == "last_login") { hasLastLogin = true; break; }
-            }
-            sqlite3_finalize(stmt);
-        } else {
-            reportError("createTable(pragma)");
-        }
-        if (!hasLastLogin) {
-            execSql("createTable(alter)", "ALTER TABLE player_save ADD COLUMN last_login DATETIME;");
-            execSql("createTable(backfill)",
+        // 2. 迁移 last_login（旧表可能没有）
+        if (!hasColumn("player_save", "last_login")) {
+            execSql("createTable(alter_last_login)",
+                    "ALTER TABLE player_save ADD COLUMN last_login DATETIME;");
+            execSql("createTable(backfill_last_login)",
                     "UPDATE player_save SET last_login = CURRENT_TIMESTAMP WHERE last_login IS NULL;");
         }
 
-        // 3. 玩家背包表
+        // 3. 迁移 state_json（第 2 批新增）
+        if (!hasColumn("player_save", "state_json")) {
+            execSql("createTable(alter_state_json)",
+                    "ALTER TABLE player_save ADD COLUMN state_json TEXT;");
+        }
+
+        // 4. 玩家背包表
         execSql("createTable(player_inventory)",
                 "CREATE TABLE IF NOT EXISTS player_inventory ("
                 "player_name TEXT, "
                 "item_id TEXT, "
                 "PRIMARY KEY (player_name, item_id));");
 
-        // 4. 玩家标签表
+        // 5. 玩家标签表
         execSql("createTable(player_tags)",
                 "CREATE TABLE IF NOT EXISTS player_tags ("
                 "player_name TEXT, "
@@ -112,7 +121,8 @@ public:
                 "PRIMARY KEY (player_name, tag_id));");
     }
 
-    // 写档。返回 false 表示**没写进去**，上层必须知道（旧实现返回 void，等于把失败藏了）。
+    // ---------------- 旧接口（保留，旧档兼容） ----------------
+
     bool saveData(const std::string& playerName, int affinity, const std::string& currentNode) {
         const char* sql = "INSERT OR REPLACE INTO player_save "
                           "(player_name, affinity, current_node, last_login) "
@@ -154,9 +164,54 @@ public:
         return ok;
     }
 
+    // ---------------- 第 2 批新增：state_json 全量存取 ----------------
+
+    // 存：写 state_json + 同步 current_node / affinity（便于旧 UI 列表显示）
+    bool saveStateJson(const std::string& playerName, const std::string& stateJson) {
+        const char* sql =
+            "INSERT INTO player_save (player_name, state_json, last_login) "
+            "VALUES (?, ?, datetime('now','localtime')) "
+            "ON CONFLICT(player_name) DO UPDATE SET "
+            "state_json = excluded.state_json, "
+            "last_login = excluded.last_login;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            reportError("saveStateJson(prepare)");
+            return false;
+        }
+        sqlite3_bind_text(stmt, 1, playerName.data(), static_cast<int>(playerName.size()), SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, stateJson.data(), static_cast<int>(stateJson.size()), SQLITE_TRANSIENT);
+
+        const int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        if (rc != SQLITE_DONE) {
+            reportError("saveStateJson(step)");
+            return false;
+        }
+        return true;
+    }
+
+    // 读：返回空串表示"没有 state_json"（旧档），上层回退到 loadData
+    std::string loadStateJson(const std::string& playerName) {
+        const char* sql = "SELECT state_json FROM player_save WHERE player_name = ?;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            reportError("loadStateJson(prepare)");
+            return "";
+        }
+        sqlite3_bind_text(stmt, 1, playerName.data(), static_cast<int>(playerName.size()), SQLITE_TRANSIENT);
+
+        std::string out;
+        if (sqlite3_step(stmt) == SQLITE_ROW) out = columnText(stmt, 0);
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    // ---------------- 存档列表 / 删除（保留） ----------------
+
     std::vector<SaveInfo> getAllSaves() {
         std::vector<SaveInfo> saves;
-        const char* sql = "SELECT player_name, affinity, current_node, last_login "
+        const char* sql = "SELECT player_name, affinity, current_node, last_login, state_json "
                           "FROM player_save ORDER BY last_login DESC LIMIT 3;";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -168,7 +223,8 @@ public:
             info.playerName = columnText(stmt, 0);
             info.affinity = sqlite3_column_int(stmt, 1);
             info.currentNode = columnText(stmt, 2);
-            info.lastLogin = columnText(stmt, 3);   // 可能是 NULL（旧档迁移前），现在是空串而不是崩
+            info.lastLogin = columnText(stmt, 3);
+            info.hasStateJson = !columnText(stmt, 4).empty();
             saves.push_back(info);
         }
         sqlite3_finalize(stmt);
@@ -200,6 +256,8 @@ public:
         }
         return allOk;
     }
+
+    // ---------------- 背包 / 标签（保留） ----------------
 
     bool addItem(const std::string& playerName, const std::string& itemId) {
         const char* sql = "INSERT OR IGNORE INTO player_inventory (player_name, item_id) VALUES (?, ?);";

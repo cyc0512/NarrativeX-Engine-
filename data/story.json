@@ -1,88 +1,395 @@
 {
-    "nodes": {
-        "0": {
-            "npc_state": "带着一丝乖巧，正在厨房忙碌。",
-            "narrator": "【旁白】：周末的傍晚，你推开家门。厨房里传来阵阵香味，木子因正系着围裙，背对着你切菜。",
-            "npc_text": "木子因：“哥哥，你回来啦。今天大学那边累不累？晚饭马上就好。”",
-            "hint": "【提示】点击继续。",
-            "options": [ { "text": "1. 过去帮忙。", "next": "1" } ],
-            "intent_nodes": {},
-            "default_next": "1"
+  "_comment": "FS 新剧本（基于用户提供的 PRD_FS_SCRIPT v1.1 架构规范重写）。核心剧情：雨夜救赎 -> 四年后相依为命 -> 客户资料试探 -> 晚餐博弈。已完全剔除原发卡主线，代入病态依存、暴躁、安抚等隐藏状态。",
+  "phases": [
+    "evening",
+    "night",
+    "late_night"
+  ],
+  "entry": "n1_entry",
+  "frontier": {
+    "w_base": 1.0,
+    "w_urgency": 0.8,
+    "w_staleness": 1.2,
+    "w_affinity": 0.4,
+    "w_recency": 0.35,
+    "w_pending_age": 0.5,
+    "staleness_tau": 6.0,
+    "urgency_horizon": 12,
+    "top_k": 5,
+    "temperature": 0.0
+  },
+  "intent": {
+    "kw_hit_score": 0.55,
+    "kw_full_bonus": 0.3,
+    "sim_weight": 0.45,
+    "neg_penalty": 0.5,
+    "l0_confident": 0.86,
+    "l1_margin": 0.12,
+    "mmr_lambda": 0.25,
+    "top_k": 5
+  },
+  "budget": {
+    "total_tokens": 1400,
+    "persona": 260,
+    "world": 140,
+    "summary": 180,
+    "history": 360,
+    "routes": 320,
+    "output": 140,
+    "max_history_turns": 6
+  },
+  "nodes": {
+    "n1_entry": {
+      "kind": "scripted",
+      "priority": 100,
+      "once": true,
+      "window": {
+        "min_step": 0,
+        "max_step": 2
+      },
+      "phase": {
+        "allow": ["evening", "night", "late_night"]
+      },
+      "presentation": {
+        "narrator": "那是四年前的一个大雨天，雨水冷得刺骨，我正烦躁地往家赶。\n\n抄近路穿过小巷时，我一不留神，在水坑边撞倒了一个瘦小的身影。\n\n她身上披着个破旧的塑料袋，跌坐在泥水里。我原本想发火，可抬眼那刻，却撞进了一双充斥着泥泞与绝望的眼睛里。\n\n我见过太多流浪猫狗的眼神，可那一刻，我仿佛看到了曾经那个同样孤立无援的自己。于是，我向她伸出了手。\n\n一晃四年过去了，我大学毕业开始艰难创业，当年那个瘦小的女孩——木子因，也长成了高中生。她最初拘谨得像个随时会被丢弃的机器，小心翼翼。但在我反复保证绝不会抛弃她之后，她在这个家里终于有了安全感，只是……她对我的情绪，似乎变得有些异常。\n\n今天傍晚，我带着被女上司硬塞过来的几份客户资料回到家，疲惫得连衣服都没换，就一头栽进了沙发里。\n\n不知睡了多久，我睁开眼，却发现木子因正拿着那份客户的资料，目光失神地死死盯着上面。",
+        "npc_text": "哥哥，她的眼睛真好看呢。",
+        "npc_state": "目光失神，拿着客户资料，试探",
+        "hint": "【岔路口】她拿着客户的资料，语气微妙。你需要回应她。"
+      },
+      "options": [
+        {
+          "text": "1. 解释：这是我们公司安排要见的客户。",
+          "next": "n2_kitchen"
         },
-        "1": {
-            "npc_state": "极度敏感且不安，似乎正在极力隐藏围裙口袋里的某样东西。",
-            "narrator": "你走过去，她切菜的动作停了下来，转头看着你。她的左手死死地捂住围裙的口袋。",
-            "npc_text": "木子因：“哥哥……你今天好像心不在焉的。是有什么心事吗？”",
-            "hint": "【关键节点】你可以顺着话题聊，也可以试图去观察她奇怪的举动，或者直接戳穿她。",
-            "options": [
-                { "text": "1. 对不起，我有点累。", "next": "end_1" },
-                { "text": "2. 没什么，你别管了。", "next": "end_3" }
-            ],
-            "intent_nodes": {
-                "end_1": { "description": "玩家表达自己很累、遇到了麻烦，或者向木子因示弱。" },
-                "end_3": { "description": "玩家拒绝沟通，表现出防御或不耐烦。" },
-                "end_4": { "description": "玩家想要离开当前的场景，或者转移话题。" },
-                "end_getitem": { "description": "玩家要求检查她的口袋，或者试图去拿她口袋里的东西。", "reward_item": "item_hairclip" }
-            },
-            "default_next": "1"
+        {
+          "text": "2. 回避：我很累，晚一点和你解释。",
+          "next": "n3_shut"
         },
-        "end_getitem": {
-            "npc_state": "惊慌失措，拼命想要抢回你手里的东西。",
-            "narrator": "【旁白】：你无视了她的阻拦，一把抓住了她的手腕，从她口袋里掏出了一个沾着暗红色血迹的旧发卡。",
-            "npc_text": "木子因：“啊！还给我……哥哥，那个不能看！求你了！”",
-            "hint": "【系统测试】成功获得道具！你现在可以选择离开，或者利用手里的发卡继续质问她。",
-            "options": [
-                { "text": "1. 把发卡还给她，当作什么都没发生。", "next": "end_simple" }
-            ],
-            "intent_nodes": {
-                "end_3_secret": { "description": "玩家拿着发卡，质问木子因关于发卡的事情，或者指责她。", "required_item": "item_hairclip" }
-            },
-            "default_next": "end_getitem"
-        },
-        "end_1": {
-            "npc_state": "心疼、温柔。",
-            "narrator": "听到你的坦白，她放下了菜刀，轻轻抱住了你。",
-            "npc_text": "木子因：“没关系的，哥哥。无论发生什么，我都会一直陪着你。”",
-            "hint": "【系统】触发了分支 1（坦白）。",
-            "options": [{ "text": "1. 结束测试", "next": "-1" }],
-            "intent_nodes": {},
-            "default_next": "-1"
-        },
-        "end_3": {
-            "npc_state": "委屈、防御机制开启。",
-            "narrator": "她被你反问得愣住了，眼眶瞬间红了起来。",
-            "npc_text": "木子因：“我……我只是关心你而已，你干嘛凶我……”",
-            "hint": "【系统】触发了分支 3（抗拒）。",
-            "options": [{ "text": "1. 结束测试", "next": "-1" }],
-            "intent_nodes": {},
-            "default_next": "-1"
-        },
-        "end_3_secret": {
-            "npc_state": "伪装被彻底撕裂，病娇属性暴露。",
-            "narrator": "【旁白】：你拿着带血的发卡严厉地质问她。她的伪装瞬间消失了。",
-            "npc_text": "木子因：“（眼神变得空洞）既然哥哥发现了……那我也没必要装成乖乖女了吧？”",
-            "hint": "【系统】触发了隐藏子节点（道具解锁的黑化分支）。",
-            "options": [{ "text": "1. 结束测试", "next": "-1" }],
-            "intent_nodes": {},
-            "default_next": "-1"
-        },
-        "end_4": {
-            "npc_state": "极度恐慌。",
-            "narrator": "她突然一把死死抓住了你的手腕。",
-            "npc_text": "木子因：“你要去哪儿？你是不是又想走？！”",
-            "hint": "【系统】触发了分支 4（逃避）。",
-            "options": [{ "text": "1. 结束测试", "next": "-1" }],
-            "intent_nodes": {},
-            "default_next": "-1"
-        },
-        "end_simple": {
-            "npc_state": "松了一口气。",
-            "narrator": "【旁白】：你去沙发上坐下，她背对着你继续切菜。",
-            "npc_text": "木子因：“晚饭马上好。”",
-            "hint": "【系统】普通结局。",
-            "options": [{ "text": "1. 结束测试", "next": "-1" }],
-            "intent_nodes": {},
-            "default_next": "-1"
+        {
+          "text": "3. 【自由输入】对她说点什么...",
+          "next": "n_idle"
         }
+      ],
+      "default_next": "n3_shut",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": ["suspicious"],
+        "summary_hint": "哥哥醒来，看到木子因在看客户的资料。"
+      },
+      "intent": {
+        "description": "分析玩家自由输入的话，判断隐藏意图。",
+        "dynamic_routes": {
+          "n2_kitchen": "玩家表现出安抚、关心，或者病态的爱（比如：我只在乎你，我只爱你，妹妹）。",
+          "n3_shut": "玩家表现出暴躁、逃避、不耐烦（比如：关你什么事，别烦我，我很累，不想说话）。"
+        }
+      }
+    },
+    "n2_kitchen": {
+      "kind": "scripted",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": ["evening", "night", "late_night"]
+      },
+      "presentation": {
+        "narrator": "她没有继续追问，而是去厨房端出了丰盛的晚餐。每一道菜都是我喜欢吃的重口味。可我知道，长期的营养不良让她根本吃不了这些，但她装作没事一般，笑着不断给我夹菜。",
+        "npc_text": "哥哥多吃点，今天上班肯定累坏了。",
+        "npc_state": "强颜欢笑，不断给你夹菜",
+        "hint": "【岔路口】她为了迎合你做了重油辛辣的菜，自己却吃不了。"
+      },
+      "options": [
+        {
+          "text": "1. 明天我要去见那个客户，不用替我做饭了。",
+          "next": "n3_shut"
+        },
+        {
+          "text": "2. 沉默，心想怎么推掉明天的客户。",
+          "next": "n4_silence"
+        },
+        {
+          "text": "3. 【自由输入】对她说点什么...",
+          "next": "n_idle"
+        }
+      ],
+      "default_next": "n4_silence",
+      "fallback_next": "n_idle",
+      "effects": {
+        "summary_hint": "晚饭时，她强撑着不适给你夹菜。"
+      },
+      "intent": {
+        "description": "晚餐交谈：判断玩家自由输入的情绪。",
+        "dynamic_routes": {
+          "n3_shut": "玩家表现出暴躁、责备、消极情绪（比如：别做了，烦死了，做这些有什么用）。",
+          "n5_tender": "玩家表现出关心、心疼，或者病态的渴求（比如：吃点清淡的，胃不好，想一直被你喂）。"
+        }
+      }
+    },
+    "n3_shut": {
+      "kind": "scripted",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": ["evening", "night", "late_night"]
+      },
+      "redeemable": true,
+      "redeem_expire": 10,
+      "redeem_gate": {
+        "tag": "regret"
+      },
+      "presentation": {
+        "narrator": "她听完我的话，默默地放下了筷子，低声说了句：“我吃饱了。”随后站起身，转身走进了房间，重重地关上了门。",
+        "npc_text": "（门内没有任何声音，只有死一般的寂静）",
+        "npc_state": "委屈，落差极大，锁在房间里",
+        "hint": "【提示】她把自己关进了房间。你想做点什么吗？",
+        "redeem_variant": {
+          "narrator": "她愣愣地看着我，似乎要从我眼睛里读出什么。过了许久，她一言不发，把吃完的碗筷端进了厨房，背影显得格外单薄。",
+          "npc_text": "……（水龙头的水声一直响着）",
+          "npc_state": "委屈，失去安全感"
+        }
+      },
+      "options": [
+        {
+          "text": "1. 去敲她的房门道歉。",
+          "next": "n4_silence"
+        },
+        {
+          "text": "2. 觉得很累，不想管，回房睡觉。",
+          "next": "n6_goodnight"
+        }
+      ],
+      "default_next": "n6_goodnight",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": ["distant", "委屈", "落差"],
+        "affinity_delta": -10,
+        "summary_hint": "哥哥的话语刺痛了她，她关上了房门。"
+      },
+      "intent": {
+        "description": "哥哥表现出暴躁、责备、推开。",
+        "dynamic_routes": {}
+      }
+    },
+    "n4_silence": {
+      "kind": "scripted",
+      "priority": 55,
+      "once": true,
+      "phase": {
+        "allow": ["evening", "night", "late_night"]
+      },
+      "presentation": {
+        "narrator": "餐桌上只剩下沉默。我没有说话，她也没有动。房间里安静得能听到窗外树叶摩擦的声音。",
+        "npc_text": "……（她坐在原地，手指不安地绞在一起）",
+        "npc_state": "沉默，不知所措",
+        "hint": "【提示】你可以直接对她说点什么，打破沉默。"
+      },
+      "options": [
+        {
+          "text": "1. 继续沉默。",
+          "next": "n6_goodnight"
+        }
+      ],
+      "default_next": "n6_goodnight",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": ["regret"],
+        "affinity_delta": -3,
+        "set_phase": "night",
+        "summary_hint": "长时间的沉默，哥哥开始后悔；天黑了。"
+      },
+      "intent": {
+        "description": "长时间的沉默、回避。",
+        "dynamic_routes": {}
+      }
+    },
+    "n5_tender": {
+      "kind": "scripted",
+      "priority": 75,
+      "once": true,
+      "requires": {
+        "step_lte": 8
+      },
+      "phase": {
+        "allow": ["evening", "night", "late_night"]
+      },
+      "presentation": {
+        "narrator": "听到我的关心或病态的偏爱，她给我夹了更多的菜。我们享用了一顿看似丰盛温馨的晚餐。她看着我，眼神里满是沉甸甸的依恋。",
+        "npc_text": "哥哥最好了……只要哥哥不离开我，我做什么都可以。",
+        "npc_state": "信任，极度依恋，放松",
+        "hint": "【提示】她此刻显得极度信任你。",
+        "redeem_variant": {
+          "narrator": "她停下了动作，眼眶微红，似乎没想到我会这么说。",
+          "npc_text": "……真的吗？哥哥真的只在乎我吗？",
+          "npc_state": "感动，却又患得患失"
+        }
+      },
+      "options": [
+        {
+          "text": "1. 摸摸她的头，安抚她。",
+          "next": "n6_goodnight"
+        }
+      ],
+      "default_next": "n6_goodnight",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": ["trust", "病态的爱"],
+        "affinity_delta": 8,
+        "summary_hint": "哥哥给出了关心与偏爱，她感到信任与满足。"
+      },
+      "intent": {
+        "description": "哥哥给出安抚、关心，或表达出病态的爱意与占有欲。",
+        "dynamic_routes": {}
+      }
+    },
+    "n6_goodnight": {
+      "kind": "scripted",
+      "priority": 50,
+      "once": true,
+      "requires": {
+        "any": [
+          {
+            "phase_in": ["night", "late_night"]
+          },
+          {
+            "affinity_lte": 85
+          }
+        ]
+      },
+      "phase": {
+        "allow": ["evening", "night", "late_night"]
+      },
+      "presentation": {
+        "narrator": "夜深了。我站起身准备回房休息。她默默收拾着碗筷，在我转身的瞬间，轻声开口。",
+        "npc_text": "……晚安，哥哥。明天，也要早点回来。",
+        "npc_state": "不舍，盯着你的背影",
+        "hint": "【提示】今晚就到这里了。"
+      },
+      "options": [
+        {
+          "text": "1. 回房。",
+          "next": "end_peace"
+        }
+      ],
+      "default_next": "end_peace",
+      "fallback_next": "end_emptiness",
+      "effects": {
+        "affinity_delta": 2,
+        "summary_hint": "夜深了，准备休息。"
+      },
+      "intent": {
+        "description": "哥哥准备去睡觉。",
+        "dynamic_routes": {}
+      }
+    },
+    "end_peace": {
+      "kind": "ending",
+      "priority": 60,
+      "requires": {
+        "all": [
+          {
+            "phase_in": ["night", "late_night"]
+          },
+          {
+            "affinity_gte": 82
+          }
+        ]
+      },
+      "presentation": {
+        "narrator": "这一夜，她似乎睡得很安稳。我推开房门时，还能听到她房间里传来的均匀呼吸声。我们都在这个家里，找到了短暂的平静。",
+        "npc_text": "（房间里传来细微的呢喃）哥哥……不要走……",
+        "npc_state": "安睡",
+        "hint": "【结局·平静】"
+      },
+      "options": [
+        {
+          "text": "1. 结束演出。",
+          "next": "-1"
+        }
+      ],
+      "default_next": "-1",
+      "intent": {
+        "description": "今夜到此为止。",
+        "dynamic_routes": {}
+      }
+    },
+    "end_emptiness": {
+      "kind": "ending",
+      "priority": 90,
+      "requires": {
+        "all": [
+          {
+            "any": [
+              {
+                "tag": "regret"
+              },
+              {
+                "step_gte": 9
+              }
+            ]
+          },
+          {
+            "affinity_lte": 81
+          }
+        ]
+      },
+      "presentation": {
+        "narrator": "她站在水池边，看着水流冲刷着盘子。我回了房间，没有再回头。厨房的灯一直亮到天亮。那些没有被安抚的落差和委屈，像疯长的藤蔓一样，在沉默中缠绕。",
+        "npc_text": "……（她把水龙头关掉，靠在冰凉的瓷砖上，慢慢滑落蹲下）",
+        "npc_state": "绝望，落差，委屈",
+        "hint": "【结局·虚空】"
+      },
+      "options": [
+        {
+          "text": "1. 结束演出。",
+          "next": "-1"
+        }
+      ],
+      "default_next": "-1",
+      "intent": {
+        "description": "今夜到此为止。",
+        "dynamic_routes": {}
+      }
+    },
+    "n_idle": {
+      "kind": "fallback",
+      "priority": 10,
+      "once": false,
+      "cooldown": 1,
+      "presentation": {
+        "narrator": "我没有说话。钟表秒针走动的声音在客厅里被无限放大。",
+        "npc_text": "……哥哥？你今天，到底怎么了？",
+        "npc_state": "等待",
+        "hint": "【提示】你可以直接对她说点什么。"
+      },
+      "options": [
+        {
+          "text": "1. 回去继续刚才的话题。",
+          "next": "n6_goodnight"
+        }
+      ],
+      "default_next": "n6_goodnight",
+      "effects": {
+        "summary_hint": "两个人都没有开口。"
+      },
+      "intent": {
+        "description": "保底闲聊。",
+        "dynamic_routes": {}
+      }
+    },
+    "-1": {
+      "kind": "ending",
+      "terminal": true,
+      "priority": 0,
+      "once": false,
+      "presentation": {
+        "narrator": "【游戏结束】感谢游玩 FluidStory。",
+        "npc_text": ""
+      },
+      "options": [],
+      "default_next": null,
+      "intent": {
+        "description": "终末占位节点。",
+        "dynamic_routes": {}
+      }
     }
+  }
 }

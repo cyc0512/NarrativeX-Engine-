@@ -27,7 +27,7 @@ int main() {
 
     // ② 正常加载，但**从不调用 createNewPlayer**（playerName 为空），读一个不存在的档
     {
-        GameEngine engine("../data/story.json");
+       EngineAdapter engine("../data/story_v2.json");
         std::printf("\n② 正常构造: ready=%d\n", engine.ready() ? 1 : 0);
         bool loaded = engine.loadExistingPlayer("根本不存在的玩家");
         std::printf("   loadExistingPlayer(不存在)=%d（应为 0）\n", loaded ? 1 : 0);
