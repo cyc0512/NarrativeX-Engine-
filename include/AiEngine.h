@@ -29,20 +29,22 @@ private:
     }
 
 public:
-    // 只负责底层的 HTTP 请求与大模型通信
     static std::string callLlm(const std::string& systemPrompt,
                                const std::string& userInput,
                                double temperature = 0.7) {
         std::string api_key, api_url;
         loadConfig(api_key, api_url);
 
-        const std::string url = api_url.empty()
-            ? "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-            : api_url;
-        const std::string model_name = "glm-4-flash";
+        if (api_key.empty() || api_key == "未配置密钥") {
+            std::cerr << "【AiEngine】致命错误：未读取到 api_key！" << std::endl;
+            return "";
+        }
 
+        // 👈 核心修复：URL 必须写域名！
+        const std::string url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+        
         json reqBody;
-        reqBody["model"] = model_name;
+        reqBody["model"] = "glm-4-flash";
         reqBody["messages"] = json::array({
             {{"role", "system"}, {"content", systemPrompt}},
             {{"role", "user"},   {"content", userInput}}
@@ -57,10 +59,15 @@ public:
         headers = curl_slist_append(headers, ("Authorization: Bearer " + api_key).c_str());
         headers = curl_slist_append(headers, "Content-Type: application/json");
 
+        // 👈 这里：用域名 + 真实的 IP 欺骗底层网络
+        struct curl_slist* resolve = nullptr;
+        resolve = curl_slist_append(resolve, "open.bigmodel.cn:443:39.108.52.113");
+
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_RESOLVE, resolve);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
@@ -69,16 +76,30 @@ public:
         CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
-        if (res != CURLE_OK || readBuffer.empty()) return "";
+        curl_slist_free_all(resolve);
+
+        if (res != CURLE_OK) {
+            std::cerr << "【AiEngine】网络请求报错: " << curl_easy_strerror(res) << std::endl;
+            return "";
+        }
+        if (readBuffer.empty()) {
+            std::cerr << "【AiEngine】收到空响应！" << std::endl;
+            return "";
+        }
 
         try {
             json response = json::parse(readBuffer);
-            if (response.contains("error")) return "";
+            if (response.contains("error")) {
+                std::cerr << "【AiEngine】API 报错: " << response["error"].dump() << std::endl;
+                return "";
+            }
             if (response.contains("choices") && response["choices"].is_array()
                 && !response["choices"].empty()) {
                 return response["choices"][0]["message"]["content"].get<std::string>();
             }
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            std::cerr << "【AiEngine】JSON解析失败: " << e.what() << "\n原文: " << readBuffer << std::endl;
+        }
         return "";
     }
 };

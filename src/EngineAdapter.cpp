@@ -12,23 +12,16 @@
 
 using json = nlohmann::json;
 
-// ---------------------------------------------------------------------------
-// 构造 / 析构
-// ---------------------------------------------------------------------------
 EngineAdapter::EngineAdapter(const std::string& storyPath)
     : storyPath_(storyPath) {
     loadStory();
 }
 
 EngineAdapter::~EngineAdapter() {
-    // 等待后台 inflight 的线程结束，防止 UAF
     for (int i = 0; i < 2400 && inflight_.load() > 0; ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
 }
 
-// ---------------------------------------------------------------------------
-// 路径容错
-// ---------------------------------------------------------------------------
 bool EngineAdapter::fileReadable(const std::string& p) {
     std::ifstream f(p);
     return f.good();
@@ -51,9 +44,6 @@ std::string EngineAdapter::resolveDataPath(const std::string& rel) const {
     return rel;
 }
 
-// ---------------------------------------------------------------------------
-// 加载剧本
-// ---------------------------------------------------------------------------
 bool EngineAdapter::loadStory() {
     const std::string path = resolveDataPath(storyPath_);
     std::ifstream f(path);
@@ -116,18 +106,12 @@ bool EngineAdapter::isGameOver() {
     return engine_ ? engine_->is_over() : true;
 }
 
-// ---------------------------------------------------------------------------
-// 重建 engine_ 
-// ---------------------------------------------------------------------------
 void EngineAdapter::rebuildEngine(nx::GameState st) {
     if (!catalog_) return;
     engine_ = std::make_unique<nx::NarrativeEngine>(*catalog_, st);
     engine_->set_selector(selector_.get());
 }
 
-// ---------------------------------------------------------------------------
-// 玩家管理
-// ---------------------------------------------------------------------------
 void EngineAdapter::createNewPlayer(const std::string& name) {
     std::lock_guard<std::mutex> g(stateMutex_);
     playerName_ = name;
@@ -149,7 +133,6 @@ bool EngineAdapter::loadExistingPlayer(const std::string& name) {
         try { st = nx::StoryLoader::state_from_json(sj); }
         catch (...) { return false; }
     } else {
-        // 旧档兼容：只有 affinity + current_node
         int aff = 0; std::string node;
         if (!db_->loadData(name, aff, node)) return false;
         st = nx::StoryLoader::new_state(name, aff, node);
@@ -161,9 +144,6 @@ bool EngineAdapter::loadExistingPlayer(const std::string& name) {
     return true;
 }
 
-// ---------------------------------------------------------------------------
-// 展示
-// ---------------------------------------------------------------------------
 std::vector<std::string> EngineAdapter::splitPages(const std::string& n,
                                                    const std::string& p) {
     std::string full = n;
@@ -213,9 +193,6 @@ bool EngineAdapter::isFreeInputAvailable() const {
     return !n->intent.description.empty() || n->intent.must_freeform;
 }
 
-// ---------------------------------------------------------------------------
-// 历史与台词
-// ---------------------------------------------------------------------------
 void EngineAdapter::pushHistory(const std::string& u, const std::string& r) {
     history_.emplace_back(u, r);
     while (history_.size() > 3) history_.pop_front();
@@ -227,15 +204,15 @@ std::string EngineAdapter::generateReplyForNode(const nx::NodeSpec& node,
         "你是木子因，一个对哥哥有强烈依恋的高中生。当前场景：" + node.npc_state +
         "\n只输出一句台词，符合你的性格和当前状态。不要输出 JSON，不要解释。";
     try {
-        std::cout << "【台词生成】正在请求 AI..." << std::endl; // 👈 加日志
+        std::cout << "【台词生成】正在请求 AI..." << std::endl;
         std::string raw = AiEngine::callLlm(sys, userInput, 0.7);
         if (!raw.empty()) {
-            std::cout << "【台词生成】AI 返回: " << raw << std::endl; // 👈 加日志
+            std::cout << "【台词生成】AI 返回: " << raw << std::endl;
             return raw;
         }
-        std::cout << "【台词生成】AI 返回为空，降级为原剧本台词。" << std::endl; // 👈 加日志
+        std::cout << "【台词生成】AI 返回为空，降级为原剧本台词。" << std::endl;
     } catch (...) {
-        std::cout << "【台词生成】异常，降级为原剧本台词。" << std::endl; // 👈 加日志
+        std::cout << "【台词生成】异常，降级为原剧本台词。" << std::endl;
     }
     return node.npc_text.empty() ? "……" : node.npc_text;
 }
@@ -247,9 +224,6 @@ void EngineAdapter::advance() {
     persist();
 }
 
-// =========================================================================
-// 核心 step：包含拓扑锁与台词生成优化
-// =========================================================================
 StepResult EngineAdapter::step(const std::string& input) {
     struct G {
         std::atomic<int>& c;
@@ -268,7 +242,7 @@ StepResult EngineAdapter::step(const std::string& input) {
 
     bool isNumeric = !input.empty() && input.find_first_not_of("0123456789") == std::string::npos;
 
-    // 1. 拓扑锁：保护基础拓扑不被破坏，拦截非相邻越界
+    // 拓扑锁：保护基础拓扑不被破坏，拦截非相邻越界
     if (!isNumeric && (tr.layer == "L1" || tr.layer == "L2" || tr.layer == "fallback")) {
         std::lock_guard<std::mutex> g(stateMutex_);
         const nx::NodeSpec* cur = catalog_->find(tr.from_node);
@@ -282,12 +256,15 @@ StepResult EngineAdapter::step(const std::string& input) {
                 }
             }
 
-            // 如果试图跳去非相邻节点，强制拦截并留在原地！
             if (!is_legal) {
                 std::cout << "【拓扑锁】AI 试图越界前往 " << tr.to_node 
                           << "，由于未获得钥匙，被拦截并留在原地。\n";
+                
+                // 👇 核心修复 1：把引擎内部的节点状态硬拽回来！
+                engine_->mutable_state().current_node = tr.from_node;
+                
                 tr.to_node = tr.from_node; 
-                tr.layer = "L2_local"; // 标记为原地受限回复
+                tr.layer = "L2_local"; 
             }
         }
     }
@@ -306,11 +283,9 @@ StepResult EngineAdapter::step(const std::string& input) {
         std::lock_guard<std::mutex> g(stateMutex_);
         const nx::NodeSpec* n = catalog_->find(tr.to_node);
         if (n) {
-            // 2. 台词优化：如果是数字（选项）或者 L0 命中，直接用剧本台词，不调 AI
             if (tr.layer == "L0" || isNumeric) {
                 reply = n->npc_text;
             } else {
-                // 不管是合法的隐藏支线，还是被拦截后的原地闲聊，都使用当前落点的上下文调 AI
                 reply = generateReplyForNode(*n, input);
             }
         }

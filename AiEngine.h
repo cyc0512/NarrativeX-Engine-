@@ -92,6 +92,7 @@ public:
             std::string payload = reqBody.dump();
 
             CURL* curl = curl_easy_init();
+curl_easy_setopt(curl, CURLOPT_PROXY, "http://192.168.195.1:7890");
             std::string readBuffer;
             if (curl) {
                 struct curl_slist* headers = NULL;
