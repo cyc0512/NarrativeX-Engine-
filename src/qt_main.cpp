@@ -389,7 +389,7 @@ int main(int argc, char *argv[]) {
         QFutureWatcher<StepResult>* watcher = new QFutureWatcher<StepResult>(&window);
         QPointer<QFutureWatcher<StepResult>> watcherGuard(watcher);
 
-        QObject::connect(watcher, &QFutureWatcher<StepResult>::finished,
+               QObject::connect(watcher, &QFutureWatcher<StepResult>::finished,
                          [&, watcherGuard, timerGuard, done]() {
             *done = true;
             aiInFlight = false;
@@ -402,18 +402,29 @@ int main(int argc, char *argv[]) {
             if (watcherGuard.isNull()) return;
 
             StepResult sr = watcherGuard->result();
-            QString reply = QString::fromStdString(sr.reply);
-            if (reply.isEmpty()) reply = "（木子因似乎陷入了沉默）";
-
-            dialogBox->setText(reply);
+            
+            // 1. 只要拿到了 AI 的回复，不管跳没跳节点，先显示出来！
+            if (!sr.reply.empty()) {
+                dialogBox->setText(QString::fromStdString(sr.reply));
+            } else {
+                dialogBox->setText("（木子因似乎陷入了沉默）");
+            }
             sendBtn->setDisabled(false);
 
+            // 2. 如果节点发生了变化（合法跳转），刷新整个 UI
             if (sr.moved) {
                 currentPageIndex = 0;
                 QTimer::singleShot(600, [&]() { refreshUI(); });
             } else {
+                // 3. 如果节点没变（被拦截或原地闲聊），重新显示输入框和选项
                 inputWidget->show();
                 inputBox->setFocus();
+                
+                // 恢复选项按钮显示
+                for (int j = 0; j < optionsLayout->count(); ++j) {
+                    QLayoutItem *it = optionsLayout->itemAt(j);
+                    if (it && it->widget()) it->widget()->show();
+                }
             }
 
             watcherGuard->deleteLater();

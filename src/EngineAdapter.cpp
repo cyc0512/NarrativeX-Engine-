@@ -198,11 +198,65 @@ void EngineAdapter::pushHistory(const std::string& u, const std::string& r) {
     while (history_.size() > 3) history_.pop_front();
 }
 
+std::string EngineAdapter::detectTag(const std::string& userInput, const std::string& npcState) {
+    std::string tag_rules = "无。";
+    std::ifstream f("../data/tags.json");
+    if (f.is_open()) {
+        try {
+            nlohmann::json j; f >> j;
+            tag_rules = "";
+            for (auto& [id, desc] : j["tags"].items()) {
+                tag_rules += "- 标签ID: " + id + " | 判定线索: " + desc.get<std::string>() + "\n";
+            }
+        } catch (...) {}
+        f.close();
+    }
+
+    std::string sys = 
+        "你是一个心理分析器。请根据当前场景和玩家输入，判断玩家的状态。\n"
+        "【当前场景】：" + npcState + "\n"
+        "【可选标签池】：\n" + tag_rules + "\n"
+        "【规则】：只能从池子中选一个最匹配的标签输出；如果不匹配任何标签，输出 'none'。\n"
+        "只输出标签ID，不要输出其他任何字符。";
+
+    std::cout << "【标签判定】请求分析情绪..." << std::endl;
+    std::string result = AiEngine::callLlm(sys, userInput, 0.1);
+    std::cout << "【标签判定】返回: " << result << std::endl;
+    
+    result.erase(std::remove_if(result.begin(), result.end(), ::isspace), result.end());
+    
+    if (!result.empty() && result != "none" && tag_rules.find("标签ID: " + result) != std::string::npos) {
+        return result;
+    }
+    return "none";
+}
+
 std::string EngineAdapter::generateReplyForNode(const nx::NodeSpec& node,
                                                 const std::string& userInput) {
+    std::string tags_emotion = "平静。";
+    {
+        std::lock_guard<std::mutex> g(stateMutex_);
+        auto tags = engine_->state().tags;
+        if (!tags.empty()) {
+            tags_emotion = "你此刻心里带着这些情绪：";
+            for (const auto& t : tags) {
+                if (t == "lost_after_refusal") tags_emotion += "失落、被抛弃感、有些委屈；";
+                else if (t == "deeply_touched") tags_emotion += "极度依恋、安心、离不开他；";
+                else if (t == "suspicion") tags_emotion += "怀疑、不安、想试探他；";
+                else if (t == "regret") tags_emotion += "后悔、想要挽留；";
+                else tags_emotion += "有微妙的变化；";
+            }
+        }
+    }
+
     const std::string sys =
-        "你是木子因，一个对哥哥有强烈依恋的高中生。当前场景：" + node.npc_state +
-        "\n只输出一句台词，符合你的性格和当前状态。不要输出 JSON，不要解释。";
+        "你是一个名叫木子因的高中生，对哥哥有极端的依赖和病态的依恋。\n"
+        "【当前物理场景】：" + node.npc_state + "\n"
+        "【你此刻的心理状态】：" + tags_emotion + "\n"
+        "【对话对象】：哥哥（也就是玩家）\n"
+        "【你的任务】：用木子因的口吻，直接回应哥哥刚才说的话。\n"
+        "【严禁】：绝对不要输出心理状态、动作描写，也不要输出 JSON。只输出她嘴里说出来的那句台词。如果不想说话，就输出省略号。";
+    
     try {
         std::cout << "【台词生成】正在请求 AI..." << std::endl;
         std::string raw = AiEngine::callLlm(sys, userInput, 0.7);
@@ -233,6 +287,8 @@ StepResult EngineAdapter::step(const std::string& input) {
 
     StepResult sr;
     nx::TurnResult tr;
+    
+    // 1. 步进（短暂上锁）
     {
         std::lock_guard<std::mutex> g(stateMutex_);
         if (!engine_ || !catalog_) return sr;
@@ -242,7 +298,7 @@ StepResult EngineAdapter::step(const std::string& input) {
 
     bool isNumeric = !input.empty() && input.find_first_not_of("0123456789") == std::string::npos;
 
-    // 拓扑锁：保护基础拓扑不被破坏，拦截非相邻越界
+    // 2. 拓扑锁拦截（短暂上锁）
     if (!isNumeric && (tr.layer == "L1" || tr.layer == "L2" || tr.layer == "fallback")) {
         std::lock_guard<std::mutex> g(stateMutex_);
         const nx::NodeSpec* cur = catalog_->find(tr.from_node);
@@ -257,12 +313,8 @@ StepResult EngineAdapter::step(const std::string& input) {
             }
 
             if (!is_legal) {
-                std::cout << "【拓扑锁】AI 试图越界前往 " << tr.to_node 
-                          << "，由于未获得钥匙，被拦截并留在原地。\n";
-                
-                // 👇 核心修复 1：把引擎内部的节点状态硬拽回来！
+                std::cout << "【拓扑锁】AI 试图越界前往 " << tr.to_node << "，拦截在原地。\n";
                 engine_->mutable_state().current_node = tr.from_node;
-                
                 tr.to_node = tr.from_node; 
                 tr.layer = "L2_local"; 
             }
@@ -270,30 +322,57 @@ StepResult EngineAdapter::step(const std::string& input) {
     }
 
     std::cout << "【诊断】input=[" << input << "] layer=" << tr.layer 
-              << " from=" << tr.from_node 
-              << " to=" << tr.to_node << "\n";
+              << " from=" << tr.from_node << " to=" << tr.to_node << "\n";
 
     sr.layer = tr.layer;
     sr.toNode = tr.to_node;
     sr.moved = (tr.to_node != tr.from_node);
-    sr.isNormal = false;
 
-    std::string reply;
-    {
-        std::lock_guard<std::mutex> g(stateMutex_);
-        const nx::NodeSpec* n = catalog_->find(tr.to_node);
-        if (n) {
-            if (tr.layer == "L0" || isNumeric) {
-                reply = n->npc_text;
-            } else {
-                reply = generateReplyForNode(*n, input);
+    // 3. 标签判定（无锁，去请求大模型）
+    std::string detected_tag = "none";
+    std::string cur_state = "";
+    if (!isNumeric) {
+        {
+            std::lock_guard<std::mutex> g(stateMutex_);
+            const nx::NodeSpec* cur = catalog_->find(tr.from_node);
+            if (cur) cur_state = cur->npc_state;
+        }
+        if (!cur_state.empty()) {
+            detected_tag = detectTag(input, cur_state);
+            if (detected_tag != "none") {
+                std::lock_guard<std::mutex> g(stateMutex_);
+                engine_->mutable_state().tags.insert(detected_tag);
+                tag_contexts_[detected_tag] = "当时场景[" + cur_state + "]，玩家说：" + input;
+                std::cout << "【标签系统】获得标签: " << detected_tag << " | 上下文已记录\n";
             }
         }
     }
+
+    // 4. 台词生成（无锁，去请求大模型）
+    std::string reply;
+    if (tr.layer == "L0" || isNumeric) {
+        std::lock_guard<std::mutex> g(stateMutex_);
+        const nx::NodeSpec* n = catalog_->find(tr.to_node);
+        if (n) reply = n->npc_text;
+    } else {
+        nx::NodeSpec node_copy;
+        bool has_node = false;
+        {
+            std::lock_guard<std::mutex> g(stateMutex_);
+            const nx::NodeSpec* n = catalog_->find(tr.to_node);
+            if (n) { node_copy = *n; has_node = true; }
+        }
+        
+        if (has_node) {
+            reply = generateReplyForNode(node_copy, input);
+        }
+    }
+
     if (reply.empty()) reply = tr.presentation.npc_text;
     if (reply.empty()) reply = "……";
     sr.reply = reply;
 
+    // 5. 收尾写入（短暂上锁）
     {
         std::lock_guard<std::mutex> g(stateMutex_);
         pushHistory(input, reply);

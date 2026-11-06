@@ -6,7 +6,7 @@
 #include <memory>
 #include <deque>
 #include <functional>
-
+#include <unordered_map>
 #include "nx.hpp"
 #include "DatabaseManager.h"
 
@@ -84,4 +84,9 @@ private:
 
     // 重建 engine_（createNewPlayer / loadExistingPlayer 用）
     void rebuildEngine(nx::GameState st);
+        // 存放标签的上下文，键是标签ID，值是当时发生的情景
+    std::unordered_map<std::string, std::string> tag_contexts_;
+    
+    // 大模型判定标签的函数
+    std::string detectTag(const std::string& userInput, const std::string& npcState);
 };
