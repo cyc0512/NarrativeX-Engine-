@@ -1,10 +1,6 @@
 // ---------------------------------------------------------------------------
 //  NarrativeX Engine :: nx/StoryLoader.hpp
 //  把 data/story_v2.json 编译成 Catalog 与 GameState。
-//
-//  这是整个内核**唯一依赖第三方头文件**的地方（nlohmann/json）。
-//  保持这个边界的意义：nx 内核本身零依赖，可以被服务端 / CLI / 单测直接复用；
-//  想换 JSON 库只需重写这一个文件。
 // ---------------------------------------------------------------------------
 #pragma once
 
@@ -12,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
 
 #include "Frontier.hpp"
 #include "GameState.hpp"
@@ -28,8 +25,7 @@ class StoryLoader {
 public:
     using Json = nlohmann::json;
 
-    // 编译剧本。发现任何结构性错误立即抛 NxError::BadScript（fail-fast，
-    // 绝不让一个坏剧本在运行时才崩）。
+    // 编译剧本。发现任何结构性错误立即抛 NxError::BadScript（fail-fast）。
     static Catalog load(const std::string& json_text) {
         Json doc = Json::parse(json_text);
         Catalog cat;
@@ -62,7 +58,7 @@ public:
         return st;
     }
 
-    // 从快照 JSON 恢复（EventStore 读出来的那一坨）
+    // 从快照 JSON 恢复
     static GameState state_from_json(const std::string& text) {
         Json d = Json::parse(text);
         GameState st;
@@ -140,7 +136,7 @@ public:
         return d.dump();
     }
 
-    // ---- 从剧本 JSON 读取可调参数（作者可以直接在 story.json 里调手感）----
+    // ---- 从剧本 JSON 读取可调参数 ----
     static FrontierWeights frontier_weights(const Json& doc) {
         FrontierWeights w;
         const Json& c = doc.contains("frontier") ? doc["frontier"] : doc;
@@ -182,15 +178,12 @@ public:
         b.routes = c.value("routes", b.routes);
         b.output = c.value("output", b.output);
         b.max_history_turns = c.value("max_history_turns", b.max_history_turns);
-        // 甲方硬约束 1200：剧本里配的 total_tokens 只能**收紧**，不能放大。
-        // 配成 2000 的剧本会被静默压回 1200，避免出现"配置说够了、实际超发"。
-        b.total_tokens = std::min(c.value("total_tokens", kMaxPromptTokens),
-                                  kMaxPromptTokens);
+        b.total_tokens = std::min(c.value("total_tokens", kMaxPromptTokens), kMaxPromptTokens);
         if (b.total_tokens < 1) b.total_tokens = kMaxPromptTokens;
         return b;
     }
 
-    // ---- 剧本诊断：启动期 lint，有问题直接列出全部 ----
+    // ---- 剧本诊断 ----
     static std::vector<std::string> lint(const Catalog& cat, const NodeId& entry) {
         std::vector<std::string> errs;
         bool has_fallback = false;
@@ -206,10 +199,8 @@ public:
             for (const auto& o : n.options) bad("options.next", o.next);
             if (n.redeemable && n.redeem_expire <= 0)
                 errs.push_back("节点 " + n.id + " redeemable=true 但 redeem_expire<=0，永不可能挽回");
-            // R-10：可挽回节点必须带挽回变体，否则唤醒时会回放旧台词（违反硬约束 C2）。
             if (n.redeemable && !n.redeem_variant.has)
-                errs.push_back("节点 " + n.id + " redeemable=true 但缺少 presentation.redeem_variant"
-                               "（挽回时会回放旧台词，违反硬约束 C2）");
+                errs.push_back("节点 " + n.id + " redeemable=true 但缺少 presentation.redeem_variant");
             if (n.intent.description.empty() && n.kind != NodeKind::Fallback)
                 errs.push_back("节点 " + n.id + " 缺少 intent.description，AI 将无法判断这条路通向什么");
         }
@@ -230,7 +221,6 @@ public:
     }
 
 private:
-
     struct Deps {
         std::vector<TagId> tags;
         std::vector<ItemId> items;
@@ -238,17 +228,15 @@ private:
         int affinity_n = 0;
     };
 
-    // 剧本是给人手写的，必须容忍 null / 类型写错。
-    // 所有取值一律走这两个 helper，绝不在生产代码里裸调 get<T>()。
     static std::string opt_str(const Json& obj, const char* key, const std::string& def = "") {
         if (!obj.is_object() || !obj.contains(key)) return def;
         const Json& v = obj[key];
         if (v.is_null()) return def;
         if (!v.is_string())
-            throw NxError(NxError::Code::BadScript,
-                          std::string("字段 '") + key + "' 应为字符串，实际为 " + v.type_name());
+            throw NxError(NxError::Code::BadScript, std::string("字段 '") + key + "' 应为字符串，实际为 " + v.type_name());
         return v.get<std::string>();
     }
+    
     static std::vector<std::string> opt_strs(const Json& obj, const char* key) {
         std::vector<std::string> v;
         if (!obj.is_object() || !obj.contains(key)) return v;
@@ -304,12 +292,10 @@ private:
         }
 
         Deps deps;
-        n.requires_fn = raw.contains("requires")
-            ? compile_cond(raw["requires"], deps) : Condition(&always_true);
+        n.requires_fn = raw.contains("requires") ? compile_cond(raw["requires"], deps) : Condition(&always_true);
         cat.depends_tags[id] = deps.tags;
         cat.depends_items[id] = deps.items;
-        n.affinity_anchor = deps.affinity_n > 0
-            ? static_cast<int>(deps.affinity_sum / deps.affinity_n) : -1;
+        n.affinity_anchor = deps.affinity_n > 0 ? static_cast<int>(deps.affinity_sum / deps.affinity_n) : -1;
 
         n.priority = raw.value("priority", 50);
         n.weight = raw.value("weight", 1.0);
@@ -320,13 +306,9 @@ private:
         n.redeemable = raw.value("redeemable", false);
         n.redeem_expire = raw.value("redeem_expire", 1000000000LL);
         if (raw.contains("redeem_gate")) {
-            // 作者显式写了赎回条件 -> 按作者意图来
-            Deps gdeps;                   // 独立统计，赎回条件的依赖不影响主索引
+            Deps gdeps;
             n.redeem_gate = compile_cond(raw["redeem_gate"], gdeps);
         } else {
-            // 没写 -> 退化为节点自身的准入条件，语义是：
-            // "只要它重新变得可达，就允许被拉回当下的 Frontier"。
-            // 这样 redeemable=true 就不会写成"永远救不回来"的死配置。
             n.redeem_gate = n.requires_fn;
         }
 
@@ -349,11 +331,32 @@ private:
             n.intent.negatives = opt_strs(it, "negatives");
             n.intent.must_freeform = it.value("must_freeform", false);
         }
+
+        // 👇 新增：解析动态调度条件
+        if (raw.contains("early_trigger") && raw["early_trigger"].is_object()) {
+            const Json& et = raw["early_trigger"];
+            n.early_trigger.tags_all = opt_strs(et, "tags_all");
+            n.early_trigger.tags_any = opt_strs(et, "tags_any");
+            n.early_trigger.min_step = et.value("min_step", 0);
+            n.early_trigger.require_node = opt_str(et, "require_node");
+            n.early_trigger.required_phase = opt_str(et, "required_phase");
+        }
+        
+        if (raw.contains("late_recover") && raw["late_recover"].is_object()) {
+            const Json& lr = raw["late_recover"];
+            n.late_recover.tags_all = opt_strs(lr, "tags_all");
+            n.late_recover.tags_any = opt_strs(lr, "tags_any");
+            n.late_recover.min_step = lr.value("min_step", 0);
+            n.late_recover.require_node = opt_str(lr, "require_node");
+            n.late_recover.required_phase = opt_str(lr, "required_phase");
+        }
+
         return n;
     }
 
     static NodeKind parse_kind(const std::string& s) {
         if (s == "scripted")   return NodeKind::Scripted;
+        if (s == "scene")      return NodeKind::Scene;
         if (s == "emergent")   return NodeKind::Emergent;
         if (s == "redemption") return NodeKind::Redemption;
         if (s == "ending")     return NodeKind::Ending;
@@ -361,13 +364,10 @@ private:
         throw NxError(NxError::Code::BadScript, "未知 kind: " + s);
     }
 
-    // 条件编译器。未知算子 -> 直接抛错，避免拼错 key 导致条件静默恒真/恒假。
     static Condition compile_cond(const Json& c, Deps& deps) {
-        if (!c.is_object())
-            throw NxError(NxError::Code::BadScript, "条件必须是 JSON 对象");
+        if (!c.is_object()) throw NxError(NxError::Code::BadScript, "条件必须是 JSON 对象");
         if (c.empty()) return Condition(&always_true);
-        if (c.size() != 1)
-            throw NxError(NxError::Code::BadScript, "每个条件对象只能有一个算子");
+        if (c.size() != 1) throw NxError(NxError::Code::BadScript, "每个条件对象只能有一个算子");
 
         const std::string op = c.begin().key();
         const Json& arg = c.begin().value();

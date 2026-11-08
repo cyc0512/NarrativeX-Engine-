@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include "nx.hpp"
 #include "DatabaseManager.h"
-
+#include <unordered_set>
 class AiSelector;
 
 // 单步结果（Qt 版用；终端版只用 processInput 返回的 reply）
@@ -53,7 +53,11 @@ public:
     void advance();
     StepResult step(const std::string& input);
     void persist();
-
+ // 标签管理基础接口
+    void addTag(const std::string& tag);
+    void removeTag(const std::string& tag);
+    bool hasTag(const std::string& tag) const;
+    std::vector<std::string> getAllTags() const;
 private:
     std::string storyPath_;
     bool ready_ = false;
@@ -76,8 +80,9 @@ private:
     static std::string stripDotdot(const std::string& p);
     static bool fileReadable(const std::string& p);
 
-    std::string generateReplyForNode(const nx::NodeSpec& node,
-                                     const std::string& userInput);
+       std::string generateReplyForNode(const nx::NodeSpec& node,
+                                     const std::string& userInput,
+                                     const std::string& extra_tag = "");
     static std::vector<std::string> splitPages(const std::string& narrator,
                                                const std::string& npcText);
     void pushHistory(const std::string& user, const std::string& reply);
@@ -86,7 +91,7 @@ private:
     void rebuildEngine(nx::GameState st);
         // 存放标签的上下文，键是标签ID，值是当时发生的情景
     std::unordered_map<std::string, std::string> tag_contexts_;
-    
+    std::unordered_set<std::string> all_tags_; // 唯一真相源
     // 大模型判定标签的函数
     std::string detectTag(const std::string& userInput, const std::string& npcState);
 };

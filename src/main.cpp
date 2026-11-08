@@ -23,7 +23,7 @@ int main() {
     struct termios oldt, newt;
     tcgetattr(STDIN_FILENO, &oldt);
 
-   EngineAdapter engine("../data/story_v2.json");
+    EngineAdapter engine("../data/story_v2.json");
 
     if (!engine.ready()) {
         std::cerr << "\n【FS】致命错误：" << engine.lastError() << "\n"
@@ -41,6 +41,10 @@ int main() {
         auto enterGame = [&]() {
             bool inGame = true;
             while (inGame) {
+                // ========================================================
+                // 阶段 1：节点展示（旁白翻页 + 选项打印）
+                // 只有进入新节点时，才会执行这一段
+                // ========================================================
                 std::vector<std::string> pages = engine.getCurrentNodePages();
 
                 newt = oldt;
@@ -58,29 +62,53 @@ int main() {
                     std::cout << "\n";
                 }
 
+                tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
                 if (engine.isGameOver()) {
                     std::cout << "\n【FS】游戏结束，返回主菜单。\n";
                     inGame = false;
                     break;
                 }
 
-                tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+                // ========================================================
+                // 阶段 2：原地对话循环
+                // 如果玩家在当前节点自由输入，只要没跳节点，就留在这里继续聊
+                // ========================================================
+                bool stayInNode = true;
+                while (stayInNode && inGame) {
+                    std::vector<std::string> opts = engine.getCurrentOptions();
+                    if (!opts.empty()) {
+                        std::cout << "\n\033[36m【可选操作】\033[0m\n";
+                        for (size_t i = 0; i < opts.size(); ++i) {
+                            std::cout << "  " << (i + 1) << ". " << opts[i] << "\n";
+                        }
+                    }
+                    if (engine.isFreeInputAvailable()) {
+                        std::cout << "  (或直接输入你想说的话)\n";
+                    }
 
-                std::cout << "\n\033[34m> \033[0m";
-                std::string userInput;
-                std::getline(std::cin, userInput);
+                    std::cout << "\n\033[34m> \033[0m";
+                    std::string userInput;
+                    std::getline(std::cin, userInput);
 
-                if (userInput == "退出" || userInput == "结束") {
-                    std::cout << "【FS】已保存进度，返回主菜单。\n";
-                    inGame = false;
-                    break;
+                    if (userInput == "退出" || userInput == "结束") {
+                        std::cout << "【FS】已保存进度，返回主菜单。\n";
+                        inGame = false;
+                        break;
+                    }
+
+                    std::string nodeBefore = engine.getCurrentNode();
+                    std::string reply = engine.processInput(userInput);
+                    std::string nodeAfter = engine.getCurrentNode();
+
+                    std::cout << "\033[32m" << reply << "\033[0m\n";
+                    std::cout << "\033[90m[当前节点: " << nodeAfter << "]\033[0m\n";
+
+                    // 👇 核心：如果节点变了，说明剧情推进了，退出内层循环去加载新节点
+                    if (nodeBefore != nodeAfter) {
+                        stayInNode = false; 
+                    }
                 }
-
-                // 敏感词拦截已移除：所有输入直接进入引擎（由 AI / 剧本路由处理）
-
-                std::string reply = engine.processInput(userInput);
-                std::cout << "\033[32m" << reply << "\033[0m\n";
-                std::cout << "\033[90m[当前节点: " << engine.getCurrentNode() << "]\033[0m\n";
             }
         };
 

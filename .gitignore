@@ -15,7 +15,8 @@ data/save.db
 .idea/
 *.swp
 *~
-
+CMakeCache.txt
+CMakeFiles/
 # 临时测试产物
 test_story
 *.o

@@ -1,12 +1,6 @@
 // ---------------------------------------------------------------------------
 //  NarrativeX Engine :: nx/NodeModel.hpp
 //  动态节点模型 + 剧本目录 + 倒排索引。
-//
-//  与旧 story.json 模型的根本区别：
-//    旧模型：节点的"下一步"写死在 options[].next / default_next 里 -> 静态树。
-//    新模型：节点声明"我什么时候可以被访问"（requires + window + phase）
-//            和"我有多重要"（priority / kind），从不声明"我从哪里来"。
-//            "从哪里来"由 Frontier 引擎在运行时算出 -> 动态拓扑网络。
 // ---------------------------------------------------------------------------
 #pragma once
 
@@ -24,19 +18,19 @@ namespace nx {
 
 enum class NodeKind {
     Scripted,     // 作者编排的主线
+    Scene,        //普通的演出/过场节点
     Emergent,     // 由隐藏状态动态涌现
-    Redemption,   // 被后向指针挽回的旧事件（进入后自动升级为 Emergent 语义）
+    Redemption,   // 被后向指针挽回的旧事件
     Ending,       // 结局 / 主线收束
     Fallback,     // 兜底闲聊，防死锁
 };
 
-// 桶 = 硬分层。排序时 bucket 的优先级**高于**打分函数：
-// 保证作者写的主线收束永远不会被一个"碰巧高分"的随机涌现节点越过。
 inline int bucket_of(NodeKind k) noexcept {
     switch (k) {
         case NodeKind::Ending:     return 40;
         case NodeKind::Scripted:   return 30;
         case NodeKind::Redemption: return 20;
+        case NodeKind::Scene:      return 15;
         case NodeKind::Emergent:   return 10;
         case NodeKind::Fallback:   return 0;
     }
@@ -46,6 +40,7 @@ inline int bucket_of(NodeKind k) noexcept {
 inline const char* kind_name(NodeKind k) noexcept {
     switch (k) {
         case NodeKind::Scripted:   return "scripted";
+        case NodeKind::Scene:      return "scene"; 
         case NodeKind::Emergent:   return "emergent";
         case NodeKind::Redemption: return "redemption";
         case NodeKind::Ending:     return "ending";
@@ -59,83 +54,79 @@ struct OptionDef {
     NodeId next;
 };
 
-// 挽回变体台词 —— 事件被后向指针拉回时呈现的文本。
-//
-// 它存在的唯一理由是实现硬约束 C2（动态重生成）：
-//   唤醒时**不回放旧台词**，而是在"过去的时间语境里、用现在的口径把这件事重讲一遍"。
-// 没有变体的话，玩家第二次走到同一个节点会看到一模一样的文本，
-// "挽回"在观感上就退化成了"读档重来"。
 struct RedeemVariant {
     bool has = false;
     std::string narrator, npc_text, npc_state;
 };
 
-// 进入节点时产生的**确定性**副作用。
-// 注意：这里只允许写"能被 SQLite 记下来"的东西。
-// 任何浮点蓄电池式的临时量都不允许进 Effects。
 struct Effects {
     std::vector<TagId> add_tags, remove_tags;
     std::vector<ItemId> add_items, remove_items;
     double affinity_delta = 0.0;
-    std::string set_phase;              // 非空则在"阶段序号变大"时才生效
-    std::string summary_hint;           // 供后续滚动摘要使用
+    std::string set_phase;              
+    std::string summary_hint;           
 };
 
-// 给 AI 意图匹配框架看的语义描述 —— 静态剧本与 AI 的唯一接缝。
 struct IntentHint {
-    std::string description;                 // 注入 {DYNAMIC_ROUTES} 的一句话描述
-    std::vector<std::string> keywords;       // 强信号词，L0 层使用
-    std::vector<std::string> examples;       // 玩家可能的原话，L1 层计算字面相似度
-    std::vector<std::string> negatives;      // 反例词，命中扣分抑制误路由
-    bool must_freeform = false;              // true = 只能由自然语言触发
+    std::string description;                 
+    std::vector<std::string> keywords;       
+    std::vector<std::string> examples;       
+    std::vector<std::string> negatives;      
+    bool must_freeform = false;              
+};
+
+// 👇 新增：动态调度触发条件结构体
+// 用于声明某个隐藏节点在什么苛刻条件下可以被提前或重新拉入当前时间线
+struct TriggerCondition {
+    std::vector<TagId> tags_all;    // 必须同时拥有的标签
+    std::vector<TagId> tags_any;    // 只需拥有其中之一的标签
+    int min_step = 0;               // 时间线游标门槛 (seq 必须 >= min_step)
+    NodeId require_node = "";       // 必须曾经去过的节点
+    std::string required_phase = "";// 必须处于的阶段 (如 "night")
 };
 
 struct NodeSpec {
     NodeId id;
     NodeKind kind = NodeKind::Scripted;
-
-    // terminal 节点（如旧版的 "-1"）永远不进 Frontier，只作为跳转目标。
-    // 【实测教训】少了这个字段，一个无 requires 的 ending 节点会常驻最高 bucket，
-    // 导致开局就被路由到"游戏结束"。详见 reference/simulate.py V9。
     bool terminal = false;
 
     std::string narrator, npc_text, npc_state, hint;
     std::vector<OptionDef> options;
     NodeId default_next, fallback_next;
 
-    // 挽回变体（C2：不回放旧台词）。redeemable 节点必须提供，lint 会拦。
     RedeemVariant redeem_variant;
 
-    // 支柱一：生命周期（配合 time_cursor）
+    // 支柱一：生命周期
     Seq min_step = 0;
     Seq max_step = 1000000000LL;
 
-    // 物理时间闸门（防"晚上吃午饭"）
-    std::vector<std::string> phases;         // 空 = 不限
+    // 物理时间闸门
+    std::vector<std::string> phases;         
     int phase_index_min = 0;
     int phase_index_max = 1000000000;
 
-    // 支柱二：准入条件（剔除后剩下的就是 Current_Frontier 的成员）
+    // 支柱二：准入条件
     Condition requires_fn = &always_true;
 
-    // 空缺一：排序参数
+    // 排序参数
     int priority = 50;
     double weight = 1.0;
-    // 好感度锚点：StoryLoader 在编译 requires 时把 affinity_gte/lte 的均值写进来，
-    // Frontier 打分用它衡量"玩家当前状态与该节点设计意图的贴合度"。
-    // -1 表示该节点没有好感度倾向，此项不参与打分。
     int affinity_anchor = -1;
     bool once = true;
     int cooldown = 0;
     std::string exclusive_group;
 
-    // 支柱三：可挽回性（后向指针）
+    // 支柱三：可挽回性
     bool redeemable = false;
     Condition redeem_gate = &always_true;
     Seq redeem_expire = 1000000000LL;
 
     Effects effects;
     IntentHint intent;
+
+    // 👇 新增：动态调度的两个核心字段
+    TriggerCondition early_trigger; // 提前接入条件
+    TriggerCondition late_recover;  // 过去重归条件
 
     // ---- 判定 helper ------------------------------------------------------
     int bucket() const noexcept { return bucket_of(kind); }
@@ -151,22 +142,18 @@ struct NodeSpec {
         }
         return phase_index >= phase_index_min && phase_index <= phase_index_max;
     }
+    
+    // 辅助函数：检查动态调度条件是否满足
+    bool check_trigger(const TriggerCondition& tc, const struct GameState& st) const;
 };
 
 // ---------------------------------------------------------------------------
 //  Catalog：剧本字典 + 倒排索引
-//
-//  实测数据（见 reference/simulate.py 的基准）：
-//    500 节点  倒排索引 783us/步   全表遍历 1657us/步   -> 2.1x
-//   1000 节点  倒排索引 1472us/步  全表遍历 3529us/步   -> 2.4x
-//  【诚实结论】2.1~2.4x 值得保留，但**它不是瓶颈**：同一次对话里 LLM 往返
-//  约 0.8~3s，比重算整个 Frontier 慢 3 个数量级以上。真正的优化方向是
-//  减少 LLM 调用次数（这正是 IntentMatch 三级漏斗做的事），而不是在这里抠性能。
 // ---------------------------------------------------------------------------
 class Catalog {
 public:
     std::unordered_map<NodeId, NodeSpec> nodes;
-    std::vector<std::string> phases;   // 物理时间阶段的有序列表，索引即"时间进度"
+    std::vector<std::string> phases;   
 
     void put(NodeSpec n) { nodes[n.id] = std::move(n); }
 
@@ -180,19 +167,14 @@ public:
         return -1;
     }
 
-    // 倒排索引：tag / item -> 依赖它的节点集合。
-    // 建索引发生在加载期一次，此后每次 Frontier 重算只读。
-    // 注意：含 not / affinity / step / phase 条件的节点无法用"存在性"剪枝，
-    //       会被登记进 always —— 它们每步都要重新求值，这是正确性的代价。
     struct Index {
         std::unordered_map<TagId, std::unordered_set<NodeId>> by_tag;
         std::unordered_map<ItemId, std::unordered_set<NodeId>> by_item;
         std::unordered_set<NodeId> always;
-        std::unordered_map<NodeId, std::unordered_set<NodeId>> neighbors;  // 前向指针
+        std::unordered_map<NodeId, std::unordered_set<NodeId>> neighbors;  
     };
     Index index;
 
-    // 依赖集合，由 StoryLoader 在编译条件时填充。finalize_index() 依赖它。
     std::unordered_map<NodeId, std::vector<TagId>>  depends_tags;
     std::unordered_map<NodeId, std::vector<ItemId>> depends_items;
 
@@ -222,7 +204,6 @@ public:
         }
     }
 
-    // 召回"可能被本次状态影响"的候选。传入当前状态的两个集合即可。
     std::vector<NodeId> candidate_ids(const std::unordered_set<TagId>& tags,
                                       const std::unordered_set<ItemId>& items,
                                       const NodeId& current) const {

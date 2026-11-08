@@ -1,5 +1,5 @@
 {
-  "_comment": "FS 剧本 v2（nx::StoryLoader 格式）。改动：选项去序号；intent 用 keywords/examples/negatives；-1 的 default_next 改空串。",
+  "_comment": "FS 剧本 v2（nx::StoryLoader 格式）。已全面统一标签命名为中文。",
   "phases": ["evening", "night", "late_night"],
   "entry": "n1_entry",
   "frontier": {
@@ -52,12 +52,12 @@
         { "text": "回避：我很累，晚一点和你解释。", "next": "n3_shut" }
       ],
       "default_next": "n3_shut",
-      "fallback_next": "n_idle",
+      "fallback_next": "n_idle",  
       "effects": {
-        "add_tags": ["suspicious"],
+      "add_tags": ["suspicious"],
         "summary_hint": "哥哥醒来，看到木子因在看客户的资料。"
       },
-              "intent": {
+      "intent": {
         "description": "承接开场试探。如果玩家解释客户的事情，去 n2_kitchen。如果玩家表现出暴躁、不耐烦或回避，去 n3_shut。",
         "keywords": [], 
         "examples": [
@@ -66,6 +66,32 @@
           "关你什么事，少管我",
           "我上了一天班真的很累"
         ],
+        "negatives": []
+      }
+    },
+    "n_hidden_breakdown": {
+      "kind": "scene",
+      "priority": 200, 
+      "presentation": {
+        "narrator": "她突然像疯了一样扑过来，死死抓住你的衣角，眼眶通红，声音颤抖得厉害。",
+        "npc_text": "哥哥……你是不是觉得我太烦了？你是不是想丢下我？我不许……我不许你去找别人！",
+        "npc_state": "情绪崩溃，病态占有欲爆发",
+        "hint": "【隐藏触发】她的情绪彻底失控了。"
+      },
+      "options": [
+        { "text": "抱住她，安抚她。", "next": "n6_goodnight" }
+      ],
+      "default_next": "n6_goodnight",
+      "early_trigger": {
+        "tags_all": ["deeply_touched"],
+        "tags_any": ["jealousy", "grievance"],
+        "min_step": 2
+
+      },
+      "intent": {
+        "description": "这是她崩溃的隐藏节点。",
+        "keywords": [],
+        "examples": [],
         "negatives": []
       }
     },
@@ -108,7 +134,7 @@
       "phase": { "allow": ["evening", "night", "late_night"] },
       "redeemable": true,
       "redeem_expire": 10,
-      "redeem_gate": { "tag": "regret" },
+      "redeem_gate": { "tag": "后悔道歉" },
       "presentation": {
         "narrator": "她听完我的话，默默地放下了筷子，低声说了句：“我吃饱了。”随后站起身，转身走进了房间，重重地关上了门。",
         "npc_text": "（门内没有任何声音，只有死一般的寂静）",
@@ -127,7 +153,7 @@
       "default_next": "n6_goodnight",
       "fallback_next": "n_idle",
       "effects": {
-        "add_tags": ["distant", "委屈", "落差"],
+      "add_tags": ["grievance", "loneliness"],
         "affinity_delta": -10,
         "summary_hint": "哥哥的话语刺痛了她，她关上了房门。"
       },
@@ -155,7 +181,7 @@
       "default_next": "n6_goodnight",
       "fallback_next": "n_idle",
       "effects": {
-        "add_tags": ["regret"],
+      "add_tags": ["regret"],
         "affinity_delta": -3,
         "set_phase": "night",
         "summary_hint": "长时间的沉默，哥哥开始后悔；天黑了。"
@@ -190,7 +216,7 @@
       "default_next": "n6_goodnight",
       "fallback_next": "n_idle",
       "effects": {
-        "add_tags": ["trust", "病态的爱"],
+               "add_tags": ["deeply_touched", "trust"],
         "affinity_delta": 8,
         "summary_hint": "哥哥给出了关心与偏爱，她感到信任与满足。"
       },
@@ -265,7 +291,7 @@
       "priority": 90,
       "requires": {
         "all": [
-          { "any": [{ "tag": "regret" }, { "step_gte": 9 }] },
+          { "any": [{ "tag": "后悔道歉" }, { "step_gte": 9 }] },
           { "affinity_lte": 81 }
         ]
       },
