@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "Condition.hpp"
+#include "GameState.hpp"
 #include "Types.hpp"
 
 namespace nx {
@@ -24,6 +25,27 @@ enum class NodeKind {
     Ending,       // 结局 / 主线收束
     Fallback,     // 兜底闲聊，防死锁
 };
+
+// v4：节点三分类。与 NodeKind（演出形态/优先级桶）正交。
+//   - Fixed     固定节点：剧情的固定支架，时间线线性推进，绝不被移动。
+//   - Dynamic   动态节点：需先"到过"init_after 锚点才武装（时间线闸门，天然禁止回退），
+//               武装后还需满足 trigger 二次闸门才进入 Frontier。
+//   - Preposable 可前置节点：从动态节点分化出来的稀缺类型，仅当 current_node 命中
+//               insert_at 显式锚点时才允许插入当前时间线，随后同样受 trigger 约束。
+enum class NodeType {
+    Fixed,
+    Dynamic,
+    Preposable
+};
+
+inline const char* node_type_name(NodeType t) noexcept {
+    switch (t) {
+        case NodeType::Fixed:      return "fixed";
+        case NodeType::Dynamic:    return "dynamic";
+        case NodeType::Preposable: return "preposable";
+    }
+    return "unknown";
+}
 
 inline int bucket_of(NodeKind k) noexcept {
     switch (k) {
@@ -91,6 +113,7 @@ struct NodeSpec {
     bool terminal = false;
 
     std::string narrator, npc_text, npc_state, hint;
+    std::string speaker = "木子因";   // 该节点 npc_text 的说话人：木子因/老板/客户/广播…
     std::vector<OptionDef> options;
     NodeId default_next, fallback_next;
 
@@ -128,6 +151,19 @@ struct NodeSpec {
     TriggerCondition early_trigger; // 提前接入条件
     TriggerCondition late_recover;  // 过去重归条件
 
+    // 👇 v4：节点类型三分类 + 时间线 + 触发/锚点模型
+    //  type：Fixed / Dynamic / Preposable（见上方 enum 注释）。
+    //  timeline：时间线序号，用于作者编排顺序与"禁止回退"校验；
+    //            固定节点必填且 >0，动态/可前置节点缺省为 0（其推进由锚点/触发驱动）。
+    //  init_after：动态节点初始化锚点；只有玩家"到过"该节点（时间线已越过）才武装。
+    //  insert_at：可前置节点的显式锚点列表；仅当 current_node 命中其一才允许插入。
+    //  trigger：武装/锚点就位后的二次触发闸门（标签/阶段/节点/步数），与 requires 正交。
+    NodeType ntype = NodeType::Fixed;
+    Seq timeline = 0;
+    NodeId init_after = "";
+    std::vector<NodeId> insert_at;
+    TriggerCondition trigger;
+
     // ---- 判定 helper ------------------------------------------------------
     int bucket() const noexcept { return bucket_of(kind); }
 
@@ -142,10 +178,23 @@ struct NodeSpec {
         }
         return phase_index >= phase_index_min && phase_index <= phase_index_max;
     }
-    
-    // 辅助函数：检查动态调度条件是否满足
-    bool check_trigger(const TriggerCondition& tc, const struct GameState& st) const;
 };
+
+// v4：评估一个 TriggerCondition 是否满足（armed/anchor 之后的二次闸门）。
+// 空 condition（全默认值）视为恒真。与 Condition DSL（requires_fn）正交：
+// trigger 不进入 candidate_ids 的 tag/item 依赖倒排，由 Frontier 在 gate 阶段单独求值。
+inline bool trigger_satisfied(const TriggerCondition& tc, const GameState& st) {
+    for (const auto& t : tc.tags_all) if (!st.has_tag(t)) return false;
+    if (!tc.tags_any.empty()) {
+        bool any = false;
+        for (const auto& t : tc.tags_any) if (st.has_tag(t)) { any = true; break; }
+        if (!any) return false;
+    }
+    if (st.seq < tc.min_step) return false;
+    if (!tc.require_node.empty() && st.visited.count(tc.require_node) == 0) return false;
+    if (!tc.required_phase.empty() && st.phase != tc.required_phase) return false;
+    return true;
+}
 
 // ---------------------------------------------------------------------------
 //  Catalog：剧本字典 + 倒排索引
@@ -204,14 +253,17 @@ public:
         }
     }
 
+    // 👈 收敛候选集（修复"剧情乱"）：不再把 index.always（所有无 requires 依赖的节点）
+    //    在每一步全局召回。候选仅限：当前节点的出边(neighbors) + 已满足的 tag/item 依赖节点。
+    //    隐藏/动态节点由 EngineAdapter 的 early_trigger 扫描独立拉取，不走此处全局平铺。
     std::vector<NodeId> candidate_ids(const std::unordered_set<TagId>& tags,
                                       const std::unordered_set<ItemId>& items,
                                       const NodeId& current) const {
-        std::unordered_set<NodeId> acc = index.always;
-        for (const auto& t : tags)  { auto it = index.by_tag.find(t);  if (it != index.by_tag.end())  acc.insert(it->second.begin(), it->second.end()); }
-        for (const auto& i : items) { auto it = index.by_item.find(i); if (it != index.by_item.end()) acc.insert(it->second.begin(), it->second.end()); }
+        std::unordered_set<NodeId> acc;
         auto nb = index.neighbors.find(current);
         if (nb != index.neighbors.end()) acc.insert(nb->second.begin(), nb->second.end());
+        for (const auto& t : tags)  { auto it = index.by_tag.find(t);  if (it != index.by_tag.end())  acc.insert(it->second.begin(), it->second.end()); }
+        for (const auto& i : items) { auto it = index.by_item.find(i); if (it != index.by_item.end()) acc.insert(it->second.begin(), it->second.end()); }
         return std::vector<NodeId>(acc.begin(), acc.end());
     }
 };

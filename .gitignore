@@ -21,3 +21,6 @@ CMakeFiles/
 test_story
 *.o
 *.out
+# Python 缓存
+__pycache__/
+*.pyc

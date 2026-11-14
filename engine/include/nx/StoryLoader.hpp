@@ -203,6 +203,35 @@ public:
                 errs.push_back("节点 " + n.id + " redeemable=true 但缺少 presentation.redeem_variant");
             if (n.intent.description.empty() && n.kind != NodeKind::Fallback)
                 errs.push_back("节点 " + n.id + " 缺少 intent.description，AI 将无法判断这条路通向什么");
+
+            // ---- v4 结构不变量 ----
+            if (n.ntype == NodeType::Dynamic && !n.init_after.empty()
+                && cat.find(n.init_after) == nullptr)
+                errs.push_back("动态节点 " + n.id + " 的 init_after='" + n.init_after + "' 不存在");
+            if (n.ntype == NodeType::Preposable) {
+                if (n.insert_at.empty())
+                    errs.push_back("可前置节点 " + n.id + " 缺少 insert_at 锚点列表");
+                for (const auto& a : n.insert_at)
+                    if (cat.find(a) == nullptr)
+                        errs.push_back("可前置节点 " + n.id + " 的 insert_at='" + a + "' 不存在");
+            }
+            // 禁止回退：任何节点（含固定骨架）都不得指向时间线更早的非结局节点。
+            // 固定骨架是静态链 / 二叉链（不动）；动态 / 可前置节点挂在其分支上可自由向前分叉，
+            // 但整图（骨架 + 挂载）一律不得倒流回更早时间线——这是"剧情不紊乱"的硬保证。
+            {
+                auto back = [&](const std::string& field, const NodeId& tgt) {
+                    if (tgt.empty() || tgt == "-1") return;
+                    const NodeSpec* t = cat.find(tgt);
+                    if (t == nullptr || t->terminal) return;
+                    if (n.timeline > 0 && t->timeline > 0 && t->timeline < n.timeline)
+                        errs.push_back("节点 " + n.id + " (" + node_type_name(n.ntype)
+                            + ") 的 " + field + "='" + tgt + "' 指向更早时间线 tl"
+                            + std::to_string(t->timeline) + " < tl"
+                            + std::to_string(n.timeline) + "，违反禁止回退");
+                };
+                back("default_next", n.default_next);
+                for (const auto& o : n.options) back("options.next", o.next);
+            }
         }
         if (!has_fallback)
             errs.push_back("剧本缺少 kind=fallback 的兜底节点：一旦 Frontier 重算为空就会死锁");
@@ -251,6 +280,7 @@ private:
         NodeSpec n;
         n.id = id;
         n.kind = parse_kind(opt_str(raw, "kind", "scripted"));
+        n.ntype = parse_type(opt_str(raw, "type", "fixed"));   // v4：缺省 Fixed，兼容 v3
         n.terminal = raw.value("terminal", false) || id == "-1";
 
         if (raw.contains("presentation") && raw["presentation"].is_object()) {
@@ -259,6 +289,7 @@ private:
             n.npc_text  = opt_str(p, "npc_text");
             n.npc_state = opt_str(p, "npc_state");
             n.hint      = opt_str(p, "hint");
+            n.speaker   = opt_str(p, "speaker", "木子因");
             if (p.contains("redeem_variant") && p["redeem_variant"].is_object()) {
                 const Json& rv = p["redeem_variant"];
                 n.redeem_variant.narrator  = opt_str(rv, "narrator");
@@ -351,6 +382,14 @@ private:
             n.late_recover.required_phase = opt_str(lr, "required_phase");
         }
 
+        // 👇 v4：时间线与锚点/触发模型（additive，v3 脚本缺省值即 Fixed/0/空）
+        n.timeline = raw.value("timeline", 0LL);
+        n.init_after = opt_str(raw, "init_after");
+        n.insert_at = opt_strs(raw, "insert_at");
+        // trigger 是"武装/命中锚点之后"的二次闸门，刻意不入 depends_tags/depends_items，
+        // 因此不会污染 candidate_ids 的 tag·item 倒排；它只由 Frontier::gate 单独求值。
+        n.trigger = parse_trigger(raw, "trigger");
+
         return n;
     }
 
@@ -362,6 +401,28 @@ private:
         if (s == "ending")     return NodeKind::Ending;
         if (s == "fallback")   return NodeKind::Fallback;
         throw NxError(NxError::Code::BadScript, "未知 kind: " + s);
+    }
+
+    // v4：解析节点 type 字段（缺省 fixed，向后兼容 v3）。
+    static NodeType parse_type(const std::string& s) {
+        if (s == "fixed")      return NodeType::Fixed;
+        if (s == "dynamic")    return NodeType::Dynamic;
+        if (s == "preposable") return NodeType::Preposable;
+        throw NxError(NxError::Code::BadScript, "未知 type: " + s);
+    }
+
+    // v4：解析 trigger 对象（武装/锚点后的二次闸门）。
+    // 与 early_trigger/late_recover 同构，但**不**写入 deps（避免污染候选倒排）。
+    static TriggerCondition parse_trigger(const Json& raw, const char* key) {
+        TriggerCondition tc;
+        if (!raw.contains(key) || !raw[key].is_object()) return tc;
+        const Json& t = raw[key];
+        tc.tags_all = opt_strs(t, "tags_all");
+        tc.tags_any = opt_strs(t, "tags_any");
+        tc.min_step = t.value("min_step", 0);
+        tc.require_node = opt_str(t, "require_node");
+        tc.required_phase = opt_str(t, "required_phase");
+        return tc;
     }
 
     static Condition compile_cond(const Json& c, Deps& deps) {

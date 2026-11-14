@@ -231,6 +231,24 @@ public:
         return saves;
     }
 
+    // 只读：返回所有存档的 state_json（跨存档图鉴用，无 LIMIT / 无 ORDER BY）。
+    // 与 getAllSaves() 的 LIMIT 3 不同，这里要全量，供结局/角色图鉴做跨存档并集。
+    std::vector<std::string> getAllStateJsons() {
+        std::vector<std::string> out;
+        const char* sql = "SELECT state_json FROM player_save "
+                          "WHERE state_json IS NOT NULL AND state_json <> '';";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            reportError("getAllStateJsons(prepare)");
+            return out;
+        }
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            out.push_back(columnText(stmt, 0));
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
     bool deleteSave(const std::string& playerName) {
         const char* sqls[3] = {
             "DELETE FROM player_save WHERE player_name = ?;",

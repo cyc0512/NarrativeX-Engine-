@@ -69,7 +69,9 @@ struct Candidate {
 
 // 被拦截的原因。debug 输出时按原因分组，一眼看出缺哪个条件。
 enum class BlockReason {
-    Ok, Terminal, Future, Expired, Phase, Consumed, Cooldown, Requires, GroupLocked
+    Ok, Terminal, Future, Expired, Phase, Consumed, Cooldown, Requires, GroupLocked,
+    Unarmed,   // v4：动态节点尚未到过 init_after 锚点（未武装）
+    Trigger    // v4：已武装/已命中锚点，但二次触发条件（标签/阶段/节点）未满足
 };
 
 inline const char* block_reason_name(BlockReason r) noexcept {
@@ -83,6 +85,8 @@ inline const char* block_reason_name(BlockReason r) noexcept {
         case BlockReason::Cooldown:    return "cooldown";
         case BlockReason::Requires:    return "requires";
         case BlockReason::GroupLocked: return "group_locked";
+        case BlockReason::Unarmed:     return "unarmed";
+        case BlockReason::Trigger:     return "trigger";
     }
     return "unknown";
 }
@@ -109,6 +113,25 @@ public:
         }
         EvalContext ctx = make_ctx(st);
         if (!n->requires_fn(ctx)) return BlockReason::Requires;
+
+        // ---- v4 节点类型闸门 ----
+        // 动态节点：必须先"到过"init_after 锚点才算武装（时间线闸门，天然禁止回退），
+        // 武装后还需满足 trigger 二次闸门才进入 Frontier。
+        if (n->ntype == NodeType::Dynamic) {
+            if (!n->init_after.empty() && st.visited.count(n->init_after) == 0)
+                return BlockReason::Unarmed;
+            if (!trigger_satisfied(n->trigger, st))
+                return BlockReason::Trigger;
+        }
+        // 可前置节点：仅当 current_node 命中 insert_at 显式锚点才允许插入当前时间线，
+        // 命中锚点后同样需满足 trigger 二次闸门。
+        if (n->ntype == NodeType::Preposable) {
+            bool anchored = false;
+            for (const auto& a : n->insert_at) if (a == st.current_node) { anchored = true; break; }
+            if (!anchored) return BlockReason::GroupLocked;
+            if (!trigger_satisfied(n->trigger, st))
+                return BlockReason::Trigger;
+        }
         return BlockReason::Ok;
     }
 
@@ -194,6 +217,16 @@ public:
         //   没有这个过滤；现把 C++ 对齐过去。
         for (const auto& p : st.pending)
             if (cat.find(p.node_id) != nullptr) cand.push_back(p.node_id);
+
+        // v4：所有动态 / 可前置节点都纳入候选池，由 gate() 统一裁决是否武装
+        // （init_after 已到）/ 命中锚点（insert_at 包含 current）/ trigger 满足。
+        // 这样 debug_frontier 能完整展示这些节点的拦截原因（unarmed / group_locked /
+        // trigger），而非让它们"凭空消失"；固定节点仍走既有的 neighbors / 依赖倒排通道。
+        for (const auto& kv : cat.nodes) {
+            const NodeSpec& m = kv.second;
+            if (m.ntype == NodeType::Dynamic || m.ntype == NodeType::Preposable)
+                cand.push_back(m.id);
+        }
 
         // 去重 + 定序：pending 与 index.always / neighbors 可能重叠，不去重会让
         // 同一个节点在 Frontier 里出现两次（Python 侧用 set 天然去重，两侧必须一致）。

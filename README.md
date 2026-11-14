@@ -7,30 +7,37 @@
 > 本仓库代码基于 MIT 协议发布，欢迎学习与交流。但严禁直接将他人的原创概念与架构思想据为己有进行商业宣传。
 ---
 
-## 📌 新文档入口（2026-10-30 新增）
+## 📌 文档入口
 
-本仓库新增了「动态迷宫」内核与配套验证工程，与原有 Qt 工程并存，可直接编译、离线运行：
-
-| 文档 | 内容 |
+| 文档 | 定位 |
 |---|---|
-| [`docs/FEASIBILITY_REVIEW.md`](docs/FEASIBILITY_REVIEW.md) | 三大支柱逐条可行性 + 现有代码缺陷清单（含 P0 致命 bug 的实测复刻） |
-| [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) | 项目计划书：M0~M5 里程碑、任务拆解、验收标准、五步集成路线 |
+| [`docs/ARCH_BLUEPRINT.md`](docs/ARCH_BLUEPRINT.md) | **现行架构蓝图**：实际编译链路、活/悬/重/尸四色盘点、待接线能力清单、分期整理路线 |
+| [`docs/CRASH_ROOT_CAUSE.md`](docs/CRASH_ROOT_CAUSE.md) | 自由输入闪退（D-4 / D-7）根因取证 |
+| `docs/ARCH_FS.md`、`docs/PRD_FS_SCRIPT.md`、`docs/PROJECT_PLAN.md`、`docs/FEASIBILITY_REVIEW.md` | **历史设计稿**（2026-10-30），主语多为未落地的 `GameSession` / `MainWindow` / `FS_ENGINE`，其中的 Python 验证章节已失效 |
+
+> 本项目代码源为 **C++**，早期因尚无 C++ 调用链而临时搭建的 Python 参考实现与验证脚本已于 2026-11-10 整体移除。
+> 未接线但具设计价值的能力（`EventStore` 时间游标、`late_recover` 后向重归指针、动态标签前置条件等）**一律保留**，详见蓝图「待接线能力清单」。
 
 | 目录 | 内容 |
 |---|---|
-| `engine/include/nx/` | 零依赖 C++14 内核：Frontier 排序、PendingPool 挽回、三级意图漏斗、剧本加载与 lint |
+| `engine/include/nx/` | 零依赖 C++17 内核（兼容 C++14）：Frontier 排序、PendingPool 挽回、三级意图漏斗、剧本加载与 lint |
 | `persistence/` | 事件溯源 + 快照持久化，四道闸门全部下沉到 SQL 触发器 |
-| `reference/` | Python 等价参考实现（`reference/nxref.py`）+ 24 项仿真（`reference/simulate.py`） |
+| `src/` | 生产入口与 `EngineAdapter` 编排层 |
+| `data/` | 剧本 `story_v2.json`（11 节点）、情绪标签 `tags.json`（14 项） |
 
-**验证方式（一条命令）**
+**验证方式（纯 C++，一条命令）**
 ```bash
-python reference/simulate.py              # 期望 24/24
-python persistence/tests/test_store.py    # 期望 17/17
-g++ -std=c++14 -Wall -Wextra -I engine/include -I include \
-    engine/tests/test_core.cpp -o nx_test && ./nx_test   # 与 Python 轨迹逐行一致
+cd ~/fs && bash persistence/tests/verify_all.sh
 ```
+该脚本做两件事：nx 内核运行期回归（C++17 / C++14 双标准零警告编译 + 32 条断言真实执行），
+以及 `EventStore` 真实 SQLite 烟测（15/15，含四道闸门）。
+2026-11-10 阶段 D 后实测：通过 7 项 / 失败 0 项 / **跳过 0 项**，`EXIT=0`；编译产物只写 `/tmp`，不在仓库留 ELF。
 
-> ⚠️ 阅读新文档前请先处理 `docs/FEASIBILITY_REVIEW.md` §4.1 的 P0 bug，它会导致 AI 中文台词被静默清空。
+> `engine/tests/test_core.cpp` 已重建为纯 C++，直接读当前生效剧本 `data/story_v2.json`，
+> 覆盖三大支柱（时间游标 / Frontier / PendingPool）、三级漏斗、1200 token 硬上限、状态往返与结局可达。
+> `late_recover` 等保护对象只验「内核能解析」，行为验证归阶段 C，用例会打印 `[待接线]` 明确标注，不假装测过。
+> 另有一条 `[已知限制]`：`n3_shut.redeem_gate.tag` 用中文「后悔道歉」，而 `effects.add_tags` 全为英文 tag，
+> 门禁永不满足；属内容侧词条定义，本测试不改剧本、不删断言。
 
 ---
 
@@ -56,7 +63,7 @@ NarrativeX 采用 **“意图分级漏斗 + 拓扑锁”** 的双引擎驱动：
 1. **L0 精确强控 (0 Token)**：通过剧本预设的 `keywords`，瞬间匹配关键动作，直接跳转固定节点，保证响应速度与剧情下限。
 2. **L1 本地相似度 (0 Token)**：利用 Jaccard 算法与剧本 `examples` 进行本地语义相似度打分，命中隐藏支线则直接跳转。
 3. **L2 受限大模型 (Top-K 选择)**：当前两层无法确定时，将**当前节点允许连接的短名单**交由大模型，大模型只做“单选题”。
-4. **拓扑锁防御 (Topology Lock)**：不管 AI 判定去了哪里，只要目标节点不在当前节点的合法后继（`options`/`default_next`）中，引擎将**强制拦截**，判定为“原地闲聊”，彻底封死 AI 的幻觉乱跳，保护基础时间线不崩坏。
+4. **拓扑锁防御 (Topology Lock)**：当 L1 本地相似度 / L2 大模型 / fallback 给出的目标节点不在当前节点的合法后继（`options` / `default_next` / `fallback_next`）中时，回退到原节点（`layer=L2_local`），并照常生成一段 AI 台词。`Dynamic_Pull`（由 `early_trigger` 前置条件触发的动态拉取）是明确的例外放行通道。实现见 `src/EngineAdapter.cpp:431-461`。
 
 ## 🕹️ 附带FluidStory游戏实例：
 
@@ -72,22 +79,34 @@ NarrativeX 采用 **“意图分级漏斗 + 拓扑锁”** 的双引擎驱动：
 
 ## 🛠️ 引擎使用指南 (User Guide)
 
-使用 **NarrativeX** 开发游戏，你不需要修改任何一行 C++ 代码。所有的剧情走向、人设与分支，都由 `data/` 目录下的两个 JSON 文件驱动。
+使用 **NarrativeX** 开发游戏，你不需要修改任何一行 C++ 代码。剧情走向、分支与情绪由
+`data/story_v2.json`（11 节点，声明式拓扑）与 `data/tags.json`（14 个情绪标签）驱动。
 
-### 1. 配置 AI 人设与行为约束 (`data/prompts.json`)
+> 注：`data/prompts.json` 是早期人设模板，当前生产链路未读取，作为待接线能力保留。
 
-剧本不再依赖死板的全图流转，而是声明式拓扑。开发者只需定义节点的 `options`（可见选项）和 `intent`（隐藏意图）：
-**示例：**
+### 1. 声明式节点（`data/story_v2.json`）
+
+开发者只需定义节点的 `options`（可见选项）、`default_next` / `fallback_next` 和 `intent`（隐藏意图）。
+下面摘自当前剧本的 `n1_entry`（结构真实，台词已省略）：
 ```json
 "n1_entry": {
-  "options": [ { "text": "解释：这是客户。", "next": "n2_kitchen" } ],
+  "kind": "scripted",
+  "once": true,
+  "window": { "min_step": 0, "max_step": 2 },
+  "phase":  { "allow": ["evening", "night", "late_night"] },
+  "presentation": { "narrator": "...", "npc_text": "...", "npc_state": "...", "hint": "..." },
+  "options": [
+    { "text": "解释：这是我们公司安排要见的客户。", "next": "n2_kitchen" },
+    { "text": "回避：我很累，晚一点和你解释。", "next": "n3_shut" }
+  ],
   "default_next": "n3_shut",
-  "intent": {
-    "keywords": ["客户", "工作", "累"],
-    "examples": ["这是公司的客户，别瞎想", "我很累，晚点说"]
-  }
+  "fallback_next": "n_idle",
+  "effects": { "add_tags": ["suspicious"] },
+  "intent": { "keywords": [], "examples": ["..."] }
 }
 ```
+节点还支持 `requires` 条件 DSL、`early_trigger` 前置条件拉取（`n_hidden_breakdown`）、
+`effects.add_tags/remove_tags` 动态标签增减等，字段全集见 `engine/include/nx/StoryLoader.hpp:250-355`。
 ## 🚀 快速开始 (Quick Start)
 
 ### 环境依赖
@@ -98,7 +117,7 @@ sudo apt install qtbase5-dev libqt5concurrent5 libsqlite3-dev libcurl4-openssl-d
 ### 构建与运行
 
 > 目录名与 CMake target 已统一为 **FS**：终端版 `fs_terminal`，Qt GUI 版 `fs`。
-> 程序内的数据路径（`../data/story.json`、`../assets/bg.jpg`）是相对路径，
+> 程序内的数据路径（`../data/story_v2.json`、`../data/tags.json`、`../assets/bg.jpg`）是相对路径，
 > 所以**必须把工作目录切到 `build/`**（或项目根目录）再运行。
 
 ```bash

@@ -1,0 +1,476 @@
+/* ============================================================
+   FS / FluidStory · 暗色 Galgame 演出主题
+   只定义视觉，不参与任何业务逻辑。
+   配色规范：
+     主强调色  accent  #c9a86a  暖金（hover / 选中 / 边框高亮）
+     危险色    danger  #a8574f  低饱和砖红（删除 / 退出）
+     主文本 #f2ede3 / 次要文本 #b9b2a6 / 提示文本 #8a8579
+     对话框 rgba(12,14,22,.86) + 1px 细边框 + 14px 圆角
+   字号层级：标题 52 / 副标题 20~24 / 正文 19 / 按钮 16 / 提示 13
+   ============================================================ */
+
+/* 根：多字体回退栈，Windows 与 Ubuntu 都能命中可用中文字体 */
+QWidget#MainWindow {
+    font-family: "Microsoft YaHei", "Noto Sans CJK SC", "Noto Serif CJK SC",
+                 "WenQuanYi Micro Hei", "PingFang SC", "Microsoft JhengHei", sans-serif;
+}
+
+/* 页面容器与选项/输入区一律透明，露出 BackgroundWidget 绘制的背景 */
+QWidget#MenuPage,
+QWidget#GamePage,
+QWidget#LoadPage,
+QWidget#EndingPage,
+QWidget#IntroPage,
+QWidget#EndingGridHost,
+QWidget#EndingScrollViewport,
+QWidget#OptionsArea,
+QWidget#InputArea,
+QStackedWidget#PageStack {
+    background: transparent;
+}
+
+/* ---------- 主菜单 ---------- */
+QLabel#TitleLabel {
+    color: #f2ede3;
+    font-size: 52px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#SubtitleLabel {
+    color: #b9b2a6;
+    font-size: 20px;
+    background: transparent;
+}
+QLabel#MenuDivider {
+    color: #c9a86a;
+    font-size: 14px;
+    background: transparent;
+}
+
+/* ---------- 通用按钮 ---------- */
+QPushButton#PrimaryButton {
+    background-color: rgba(26, 28, 38, 0.80);
+    color: #f2ede3;
+    font-size: 16px;
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 10px;
+    padding: 10px 24px;
+    min-width: 240px;
+}
+QPushButton#PrimaryButton:hover {
+    background-color: rgba(201, 168, 106, 0.22);
+    border: 1px solid #c9a86a;
+    color: #ffffff;
+}
+QPushButton#PrimaryButton:pressed {
+    background-color: rgba(201, 168, 106, 0.38);
+}
+QPushButton#PrimaryButton:disabled {
+    color: #6a6760;
+    background-color: rgba(20, 22, 28, 0.60);
+    border: 1px solid rgba(120, 118, 110, 0.30);
+}
+
+QPushButton#DangerButton {
+    background-color: rgba(26, 28, 38, 0.80);
+    color: #d8a7a1;
+    font-size: 16px;
+    border: 1px solid rgba(168, 87, 79, 0.55);
+    border-radius: 10px;
+    padding: 10px 24px;
+    min-width: 240px;
+}
+QPushButton#DangerButton:hover {
+    background-color: rgba(168, 87, 79, 0.30);
+    border: 1px solid #a8574f;
+    color: #ffe9e6;
+}
+QPushButton#DangerButton:pressed {
+    background-color: rgba(168, 87, 79, 0.50);
+}
+QPushButton#DangerButton:disabled {
+    color: #6a6760;
+    border: 1px solid rgba(120, 118, 110, 0.30);
+}
+
+/* 顶部系统菜单按钮 */
+QPushButton#SysMenuButton {
+    background-color: rgba(12, 14, 22, 0.65);
+    color: #b9b2a6;
+    font-size: 14px;
+    border: 1px solid rgba(201, 168, 106, 0.30);
+    border-radius: 8px;
+    padding: 6px 14px;
+}
+QPushButton#SysMenuButton:hover {
+    color: #f2ede3;
+    border: 1px solid #c9a86a;
+    background-color: rgba(201, 168, 106, 0.18);
+}
+QPushButton#SysMenuButton:pressed {
+    background-color: rgba(201, 168, 106, 0.32);
+}
+
+/* ---------- 对话框卡片 ---------- */
+QWidget#DialogBox {
+    background-color: rgba(12, 14, 22, 0.86);
+    border: 1px solid rgba(201, 168, 106, 0.35);
+    border-radius: 14px;
+}
+QLabel#SpeakerLabel {
+    color: #c9a86a;
+    font-size: 17px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#DialogText {
+    color: #f2ede3;
+    font-size: 17px;
+    background: transparent;
+}
+QLabel#HintLabel {
+    color: #8a8579;
+    font-size: 13px;
+    background: transparent;
+}
+QLabel#StatusLabel {
+    color: #b9b2a6;
+    font-size: 13px;
+    background: transparent;
+}
+
+/* ---------- 选项 / 继续 / 自由输入 ---------- */
+QPushButton#OptionButton {
+    background-color: rgba(26, 28, 38, 0.78);
+    color: #f2ede3;
+    font-size: 14px;
+    text-align: left;
+    border: 1px solid rgba(201, 168, 106, 0.28);
+    border-radius: 10px;
+    padding: 7px 12px;
+    min-height: 18px;
+}
+QPushButton#OptionButton:hover {
+    background-color: rgba(201, 168, 106, 0.18);
+    border: 1px solid #c9a86a;
+    color: #ffffff;
+}
+QPushButton#OptionButton:pressed {
+    background-color: rgba(201, 168, 106, 0.34);
+}
+QPushButton#OptionButton:disabled {
+    color: #6a6760;
+    border: 1px solid rgba(120, 118, 110, 0.25);
+}
+
+QPushButton#FreeInputButton {
+    background-color: rgba(201, 168, 106, 0.14);
+    color: #e7cf9f;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: left;
+    border: 1px solid rgba(201, 168, 106, 0.55);
+    border-radius: 10px;
+    padding: 10px 20px;
+}
+QPushButton#FreeInputButton:hover {
+    background-color: rgba(201, 168, 106, 0.30);
+    color: #ffffff;
+}
+QPushButton#FreeInputButton:pressed {
+    background-color: rgba(201, 168, 106, 0.44);
+}
+
+QPushButton#ContinueButton {
+    background-color: rgba(201, 168, 106, 0.20);
+    color: #f2ede3;
+    font-size: 16px;
+    font-weight: bold;
+    border: 1px solid rgba(201, 168, 106, 0.55);
+    border-radius: 10px;
+    padding: 8px 20px;
+    min-width: 140px;
+}
+QPushButton#ContinueButton:hover {
+    background-color: rgba(201, 168, 106, 0.38);
+    color: #ffffff;
+}
+QPushButton#ContinueButton:pressed {
+    background-color: rgba(201, 168, 106, 0.52);
+}
+
+/* ---------- 输入区 ---------- */
+QLineEdit#InputBox {
+    background-color: rgba(16, 18, 26, 0.90);
+    color: #f2ede3;
+    font-size: 16px;
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 8px;
+    padding: 8px 14px;
+    selection-background-color: rgba(201, 168, 106, 0.40);
+}
+QLineEdit#InputBox:focus {
+    border: 1px solid #c9a86a;
+}
+QLineEdit#InputBox:disabled {
+    color: #6a6760;
+}
+QPushButton#SendButton {
+    background-color: rgba(201, 168, 106, 0.22);
+    color: #f2ede3;
+    font-size: 16px;
+    font-weight: bold;
+    border: 1px solid rgba(201, 168, 106, 0.55);
+    border-radius: 8px;
+    padding: 8px 24px;
+}
+QPushButton#SendButton:hover {
+    background-color: rgba(201, 168, 106, 0.42);
+    color: #ffffff;
+}
+QPushButton#SendButton:pressed {
+    background-color: rgba(201, 168, 106, 0.56);
+}
+QPushButton#SendButton:disabled {
+    color: #6a6760;
+    background-color: rgba(20, 22, 28, 0.60);
+    border: 1px solid rgba(120, 118, 110, 0.30);
+}
+
+/* ---------- 存档浮层 ---------- */
+QWidget#LoadPanel {
+    background-color: rgba(12, 14, 22, 0.94);
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 16px;
+}
+QLabel#LoadTitle {
+    color: #f2ede3;
+    font-size: 24px;
+    font-weight: bold;
+    background: transparent;
+}
+QWidget#SaveSlot {
+    background-color: rgba(38, 40, 52, 0.72);
+    border: 1px solid rgba(201, 168, 106, 0.22);
+    border-radius: 10px;
+}
+QPushButton#SlotButton {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    text-align: left;
+    color: #f2ede3;
+    padding: 8px 14px;
+    font-size: 15px;
+}
+QPushButton#SlotButton:hover {
+    background-color: rgba(201, 168, 106, 0.16);
+}
+QPushButton#SlotButton:pressed {
+    background-color: rgba(201, 168, 106, 0.28);
+}
+QLabel#SlotLine1 {
+    color: #f2ede3;
+    font-size: 17px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#SlotLine2 {
+    color: #b9b2a6;
+    font-size: 14px;
+    background: transparent;
+}
+QLabel#SlotEmpty {
+    color: #8a8579;
+    font-size: 16px;
+    background: transparent;
+}
+QPushButton#DeleteButton {
+    min-width: 34px;
+    max-width: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    background-color: rgba(168, 87, 79, 0.35);
+    color: #f2ede3;
+    font-size: 14px;
+    font-weight: bold;
+    border: 1px solid rgba(168, 87, 79, 0.60);
+    border-radius: 8px;
+}
+QPushButton#DeleteButton:hover {
+    background-color: rgba(168, 87, 79, 0.75);
+    color: #ffffff;
+}
+QPushButton#DeleteButton:pressed {
+    background-color: #a8574f;
+}
+
+/* ---------- 弹窗 / 菜单 ---------- */
+QMenu {
+    background-color: #14161e;
+    color: #f2ede3;
+    border: 1px solid rgba(201, 168, 106, 0.35);
+}
+QMenu::item:selected {
+    background-color: rgba(201, 168, 106, 0.25);
+}
+QMessageBox, QInputDialog {
+    background-color: #14161e;
+}
+QMessageBox QLabel, QInputDialog QLabel {
+    color: #f2ede3;
+    font-size: 14px;
+}
+
+/* ============================================================
+   主菜单整改 / 结局图鉴 / 相遇人物 / 登录过场
+   新增选择器，全部沿用既有配色与圆角规范；字体不单独设，继承 #MainWindow。
+   ============================================================ */
+
+/* ---------- 主菜单居中卡片容器 ---------- */
+QWidget#MenuPanel {
+    background-color: rgba(12, 14, 22, 0.94);
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 16px;
+}
+
+/* ---------- 玩家姓名内嵌卡片 ---------- */
+QWidget#NamePanel {
+    background-color: rgba(38, 40, 52, 0.72);
+    border: 1px solid rgba(201, 168, 106, 0.22);
+    border-radius: 10px;
+}
+QLabel#NameHint {
+    color: #b9b2a6;
+    font-size: 14px;
+    background: transparent;
+}
+QLineEdit#NameInput {
+    background-color: rgba(16, 18, 26, 0.90);
+    color: #f2ede3;
+    font-size: 16px;
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 8px;
+    padding: 8px 14px;
+    selection-background-color: rgba(201, 168, 106, 0.40);
+}
+QLineEdit#NameInput:focus {
+    border: 1px solid #c9a86a;
+}
+
+/* ---------- 昼夜切换小按钮 ---------- */
+QPushButton#TimeToggleButton {
+    background-color: rgba(12, 14, 22, 0.65);
+    color: #b9b2a6;
+    font-size: 13px;
+    border: 1px solid rgba(201, 168, 106, 0.30);
+    border-radius: 8px;
+    padding: 6px 16px;
+}
+QPushButton#TimeToggleButton:hover {
+    color: #f2ede3;
+    border: 1px solid #c9a86a;
+    background-color: rgba(201, 168, 106, 0.18);
+}
+QPushButton#TimeToggleButton:pressed {
+    background-color: rgba(201, 168, 106, 0.32);
+}
+
+/* ---------- 图鉴通用标题 / 统计 ---------- */
+QLabel#GalleryTitle {
+    color: #f2ede3;
+    font-size: 22px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#GalleryStat {
+    color: #b9b2a6;
+    font-size: 14px;
+    background: transparent;
+}
+
+/* ---------- 相遇人物栏 ---------- */
+QWidget#CharacterCard {
+    background-color: rgba(38, 40, 52, 0.72);
+    border: 1px solid rgba(201, 168, 106, 0.22);
+    border-radius: 10px;
+}
+QLabel#CharacterThumb {
+    background: transparent;
+}
+QLabel#CharacterName {
+    color: #f2ede3;
+    font-size: 14px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#CharacterNote {
+    color: #b9b2a6;
+    font-size: 12px;
+    background: transparent;
+}
+
+/* ---------- 已收录结局页 ---------- */
+QWidget#EndingPanel {
+    background-color: rgba(12, 14, 22, 0.94);
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 16px;
+}
+QScrollArea#EndingScroll {
+    background: transparent;
+    border: none;
+}
+QPushButton#EndingCard {
+    background-color: rgba(38, 40, 52, 0.72);
+    border: 1px solid rgba(201, 168, 106, 0.22);
+    border-radius: 10px;
+    padding: 0px;
+}
+QPushButton#EndingCard:hover {
+    border: 1px solid rgba(201, 168, 106, 0.55);
+}
+QLabel#EndingThumb {
+    background: transparent;
+}
+QLabel#EndingId {
+    color: #c9a86a;
+    font-size: 13px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#EndingHint {
+    color: #b9b2a6;
+    font-size: 12px;
+    background: transparent;
+}
+QLabel#EndingDetail {
+    color: #f2ede3;
+    font-size: 14px;
+    background: transparent;
+}
+
+/* ---------- 登录过场 CG ---------- */
+QLabel#IntroImage {
+    background-color: #080a12;
+}
+QLabel#IntroCaption {
+    color: #f2ede3;
+    font-size: 18px;
+    background-color: rgba(8, 10, 18, 0.62);
+    border: 1px solid rgba(201, 168, 106, 0.22);
+    border-radius: 8px;
+    padding: 10px 22px;
+}
+QPushButton#IntroSkip {
+    background-color: rgba(12, 14, 22, 0.70);
+    color: #b9b2a6;
+    font-size: 14px;
+    border: 1px solid rgba(201, 168, 106, 0.40);
+    border-radius: 8px;
+    padding: 6px 16px;
+}
+QPushButton#IntroSkip:hover {
+    color: #f2ede3;
+    border: 1px solid #c9a86a;
+    background-color: rgba(201, 168, 106, 0.18);
+}

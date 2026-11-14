@@ -12,7 +12,8 @@ set(CMAKE_AUTOMOC ON)
 # 三条 include 路径：现有 Qt 工程头 / nx 内核头 / 持久化头。
 # 三者零重名（engine/include 只有 nx.hpp + nx/*.hpp，persistence/include 只有 nx/EventStore.hpp，
 # 现有 include/ 下既无 nx.hpp 也无 nx/ 子目录），同时挂载不会产生解析歧义。
-# T04 的 src/engine/GameSession.cpp 需要 #include "nx.hpp"，故此处必须提前就位。
+# 实际接入 nx 的是 src/EngineAdapter.h:10（#include "nx.hpp"）；
+# 原注释提到的 T04 / src/engine/GameSession.cpp 从未落地，已移除。
 include_directories(
   ${CMAKE_SOURCE_DIR}/src 
   ${CMAKE_SOURCE_DIR}/include

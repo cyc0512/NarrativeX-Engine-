@@ -1,6 +1,12 @@
 {
-  "_comment": "FS 剧本 v2（nx::StoryLoader 格式）。已全面统一标签命名为中文。",
-  "phases": ["evening", "night", "late_night"],
+  "_comment": "FS 剧本 v3 · 静态架构：n_boss_call 为唯一公共分叉点，之后【客户线】与【家长会线】彻底分离，两条线的后续子节点互不串联、不共享结局。动态节点仅保留 1 个（n_hidden_smother，初始化于 n_boss_call，累积 numbness+heartbroken 两个绝望标签触发，导向坏结局 end_bad_smother）。原 H-A/H-C 转为静态节点并入各自线；原 H-B 移除；所有 ending 标 terminal=true。标签一律英文 ID；late_recover 全程未配置。",
+  "phases": [
+    "evening",
+    "night",
+    "late_night",
+    "next_day",
+    "next_evening"
+  ],
   "entry": "n1_entry",
   "frontier": {
     "w_base": 1.0,
@@ -39,304 +45,1310 @@
       "kind": "scripted",
       "priority": 100,
       "once": true,
-      "window": { "min_step": 0, "max_step": 2 },
-      "phase": { "allow": ["evening", "night", "late_night"] },
-      "presentation": {
-        "narrator": "那是四年前的一个大雨天，雨水冷得刺骨，我正烦躁地往家赶。\n\n抄近路穿过小巷时，我一不留神，在水坑边撞倒了一个瘦小的身影。\n\n她身上披着个破旧的塑料袋，跌坐在泥水里。我原本想发火，可抬眼那刻，却撞进了一双充斥着泥泞与绝望的眼睛里。\n\n我见过太多流浪猫狗的眼神，可那一刻，我仿佛看到了曾经那个同样孤立无援的自己。于是，我向她伸出了手。\n\n一晃四年过去了，我大学毕业开始艰难创业，当年那个瘦小的女孩——木子因，也长成了高中生。她最初拘谨得像个随时会被丢弃的机器，小心翼翼。但在我反复保证绝不会抛弃她之后，她在这个家里终于有了安全感，只是……她对我的情绪，似乎变得有些异常。\n\n今天傍晚，我带着被女上司硬塞过来的几份客户资料回到家，疲惫得连衣服都没换，就一头栽进了沙发里。\n\n不知睡了多久，我睁开眼，却发现木子因正拿着那份客户的资料，目光失神地死死盯着上面。",
-        "npc_text": "哥哥，她的眼睛真好看呢。",
-        "npc_state": "目光失神，拿着客户资料，试探",
-        "hint": "【岔路口】她拿着客户的资料，语气微妙。你需要回应她。"
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
       },
-      "options": [
-        { "text": "解释：这是我们公司安排要见的客户。", "next": "n2_kitchen" },
-        { "text": "回避：我很累，晚一点和你解释。", "next": "n3_shut" }
-      ],
-      "default_next": "n3_shut",
-      "fallback_next": "n_idle",  
+      "presentation": {
+        "narrator": "傍晚的出租屋只亮着一盏灯，墙皮被潮气洇出深色的云。我把明天要参加木子因期中考家长会的通知压在桌角，又数了一遍钱包里所剩不多的钞票。\n\n她侧身从狭小的厨房端出两碗热汤，校服袖口洗得发白，碗沿却擦得干干净净，像要把这清苦的日子也一并擦亮。",
+        "npc_text": "哥哥，先喝汤吧，今天回来得比昨天早。",
+        "npc_state": "踮脚放碗，眼睛一眨不眨地望着你",
+        "hint": "【傍晚·出租屋】明天是家长会，饭桌上还压着没说出口的生计。"
+      },
+      "options": [],
+      "default_next": "n2_kitchen",
+      "fallback_next": "n_idle",
       "effects": {
-      "add_tags": ["suspicious"],
-        "summary_hint": "哥哥醒来，看到木子因在看客户的资料。"
-      },
-      "intent": {
-        "description": "承接开场试探。如果玩家解释客户的事情，去 n2_kitchen。如果玩家表现出暴躁、不耐烦或回避，去 n3_shut。",
-        "keywords": [], 
-        "examples": [
-          "这是公司的客户，别瞎想",
-          "我只爱你，别的都不重要",
-          "关你什么事，少管我",
-          "我上了一天班真的很累"
+        "add_tags": [
+          "deeply_touched",
+          "loneliness"
         ],
-        "negatives": []
-      }
-    },
-    "n_hidden_breakdown": {
-      "kind": "scene",
-      "priority": 200, 
-      "presentation": {
-        "narrator": "她突然像疯了一样扑过来，死死抓住你的衣角，眼眶通红，声音颤抖得厉害。",
-        "npc_text": "哥哥……你是不是觉得我太烦了？你是不是想丢下我？我不许……我不许你去找别人！",
-        "npc_state": "情绪崩溃，病态占有欲爆发",
-        "hint": "【隐藏触发】她的情绪彻底失控了。"
-      },
-      "options": [
-        { "text": "抱住她，安抚她。", "next": "n6_goodnight" }
-      ],
-      "default_next": "n6_goodnight",
-      "early_trigger": {
-        "tags_all": ["deeply_touched"],
-        "tags_any": ["jealousy", "grievance"],
-        "min_step": 2
-
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "傍晚回到出租屋，明天要开家长会，木子因端来热汤。这一层标签是冗余铺垫。"
       },
       "intent": {
-        "description": "这是她崩溃的隐藏节点。",
-        "keywords": [],
-        "examples": [],
-        "negatives": []
-      }
+        "description": "开场纯叙述：交代出租屋与经济拮据、明天要参加妹妹期中考家长会，以及木子因小心翼翼端汤的神态；承接后走向厨房晚饭。",
+        "keywords": [
+          "出租屋",
+          "家长会",
+          "喝汤",
+          "回家"
+        ],
+        "examples": [
+          "先喝汤吧",
+          "明天要去学校",
+          "今天回来得早"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "apartment_eve"
     },
     "n2_kitchen": {
       "kind": "scripted",
       "priority": 60,
       "once": true,
-      "phase": { "allow": ["evening", "night", "late_night"] },
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
       "presentation": {
-        "narrator": "她没有继续追问，而是去厨房端出了丰盛的晚餐。每一道菜都是我喜欢吃的重口味。可我知道，长期的营养不良让她根本吃不了这些，但她装作没事一般，笑着不断给我夹菜。",
-        "npc_text": "哥哥多吃点，今天上班肯定累坏了。",
-        "npc_state": "强颜欢笑，不断给你夹菜",
-        "hint": "【岔路口】她为了迎合你做了重油辛辣的菜，自己却吃不了。"
+        "narrator": "饭桌是张旧折叠桌，她把唯一那盘炒青菜往我这边推，自己只夹咸菜。我说明天要去学校开家长会，她眼睛亮了一下，又低头扒饭，小声说老师大概会问怎么只有哥哥来。\n\n房租还欠着半个月，我含糊应着，心里盘算别误了兼职的工钱。",
+        "npc_text": "只要哥哥来就行，我会跟老师说清楚的。",
+        "npc_state": "把菜推过来，指尖抠着碗边",
+        "hint": "【晚饭】她小心翼翼地守着这顿饭，也守着明天的家长会。"
+      },
+      "options": [],
+      "default_next": "n_boss_call",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": [
+          "deeply_touched",
+          "loneliness",
+          "guilt",
+          "anxious"
+        ],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "晚饭时她强撑着把菜让给你；四项情绪标签在此全部落地，供 H-A 组合判定。"
+      },
+      "intent": {
+        "description": "晚饭纯叙述：父兄二人围着折叠桌说起家长会与欠租，妹妹把菜让给哥哥；此处一次性写入 deeply_touched/loneliness/guilt/anxious 四个标签，作为 H-A 隐藏节点的前向铺垫。",
+        "keywords": [
+          "家长会",
+          "房租",
+          "炒青菜",
+          "兼职"
+        ],
+        "examples": [
+          "明天我去开家长会",
+          "别光让我吃",
+          "房租还欠着"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "kitchen_dinner"
+    },
+    "n_boss_call": {
+      "kind": "scene",
+      "priority": 90,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "筷子刚放下，旧手机就震了起来。是老板，声音隔着听筒都不容商量：明早去 X 市，客户点名要当面谈，这单关系到部门下半年的去留。\n\n我望向她，她正把碗筷摞得整齐，假装没在听，肩膀却绷紧了。去，就得推掉家长会；不去，这份工大概也到头了。",
+        "npc_text": "明早八点，X 市，客户要见你本人。",
+        "npc_state": "攥着手机，喉结动了动，没立刻答话",
+        "hint": "【岔路口·电话】老板要你明天去 X 市见客户，而明天是她的家长会。",
+        "speaker": "老板"
       },
       "options": [
-        { "text": "明天我要去见那个客户，不用替我做饭了。", "next": "n3_shut" },
-        { "text": "沉默，心想怎么推掉明天的客户。", "next": "n4_silence" }
+        {
+          "text": "1. 好的老板，明早去 X 市见客户。",
+          "next": "n_accept"
+        },
+        {
+          "text": "2. 推辞出差，明天去她的家长会。",
+          "next": "n_decline"
+        }
       ],
+      "default_next": "n_decline",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": [
+          "grievance",
+          "numbness",
+          "suspicious"
+        ],
+        "remove_tags": [
+          "deeply_touched",
+          "loneliness",
+          "guilt",
+          "anxious"
+        ],
+        "affinity_delta": -5,
+        "set_phase": "",
+        "summary_hint": "老板来电要求明早赴 X 市面谈；此节点是两条剧情线的唯一公共分叉点，也是「被闷死」动态节点的初始化位置。"
+      },
+      "intent": {
+        "description": "老板电话场景：要求明天去 X 市与客户见面面谈，与家长会正面冲突。选项一进入【客户线】（去公司/出差），选项二进入【家长会线】。两条线自此彻底分开，后续子节点不再互相串联。",
+        "keywords": [
+          "老板",
+          "X 市",
+          "客户",
+          "出差",
+          "家长会",
+          "去公司",
+          "推辞",
+          "好的老板"
+        ],
+        "examples": [
+          "明天家里实在走不开",
+          "好的老板我准时到",
+          "别来烦我，这活我不干了"
+        ],
+        "negatives": [
+          "对不起",
+          "商量一下"
+        ],
+        "must_freeform": false
+      },
+      "background": "street_cross"
+    },
+    "n_hidden_breakdown": {
+      "kind": "scene",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "夜已经很深了，她仍坐在折叠桌旁，把没动几口的筷子并齐了又并齐。我几次想开口，话都在舌尖打了转又缩回去。\n\n台灯拧暗一档，屋里只剩钟摆一下一下地走。方才那点热汤早凉透了，像把这个夜晚也一起封住，连呼吸都放得极轻。",
+        "npc_text": "……哥哥要是累了，就先去睡吧。",
+        "npc_state": "垂下眼，把筷子摆得笔直，笑得很勉强",
+        "hint": "【家长会线·沉默链】话没有出口，夜就这么被一点点熬薄。"
+      },
+      "options": [],
       "default_next": "n4_silence",
       "fallback_next": "n_idle",
       "effects": {
-        "summary_hint": "晚饭时，她强撑着不适给你夹菜。"
+        "add_tags": [],
+        "remove_tags": [
+          "deeply_touched",
+          "loneliness",
+          "guilt",
+          "anxious"
+        ],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "家长会线静态节点：深夜沉默先兆，清掉晚饭四标签，不再由动态拉取。"
       },
       "intent": {
-        "description": "晚餐交谈：玩家针对她做饭和客户事宜做出选择。推开、沉默、暴躁、关心身体、或表达病态爱意。",
-        "keywords": ["客户", "推掉", "暴躁", "胃痛", "吃清淡", "喂我"],
-        "examples": [
-          "我明天还要见客户，别做了",
-          "你胃不好，吃点清淡的",
-          "别光顾着我，你自己吃",
-          "真希望一直这样被你喂下去"
+        "description": "家长会线沉默链的静态一环：夜深、筷子并了又并、热汤凉透。承接 n3_shut，之后走向 n4_silence；不再依赖 any early_trigger。",
+        "keywords": [
+          "沉默",
+          "台灯",
+          "钟摆",
+          "算了",
+          "不去也行"
         ],
-        "negatives": []
-      }
+        "examples": [
+          "……我也不知道该说什么",
+          "她好像看出来了"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "night_room"
     },
-    "n3_shut": {
+    "n_fired": {
       "kind": "scripted",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "电话被挂断的忙音很短，短到像是早就准备好了。我把手机扣在桌上，屏幕暗下去，映出她怔怔望着我的脸。\n\n这个月的工钱没了，明天的车费也没了着落，而房租催缴的单子还压在桌角。我想说句没事，喉咙却像被什么堵住，只把那碗已经凉透的汤端起来，又放下。",
+        "npc_text": "……哥哥，是不是我说错什么了？",
+        "npc_state": "攥着围裙角，声音小得几乎听不见",
+        "hint": "【失业】一句气话，把这份工和这个月的嚼谷一起丢掉了。"
+      },
+      "options": [],
+      "default_next": "end_bad_starve",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": -10,
+        "set_phase": "",
+        "summary_hint": "客户线丢单后的失业：家里最后一分稳定收入没有了。"
+      },
+      "intent": {
+        "description": "客户线失业场景：合作按流程停了之后，工钱与车费落空、房租催缴单仍压在桌角；承接后进入本线饥寒坏结局 end_bad_starve。",
+        "keywords": [
+          "开除",
+          "失业",
+          "工钱",
+          "房租"
+        ],
+        "examples": [
+          "没事，我再找别的活",
+          "别问了"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "winter_hardship"
+    },
+    "end_bad_starve": {
+      "kind": "ending",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "后来的日子一天比一天薄：退了教辅，把三餐并成两顿，最后连那盏昏黄的灯也舍不得多开。\n\n我跑遍能跑的地方，回回都撞在同一句『等通知』上。她反倒不闹了，只把碗里稠的拨给我，自己喝汤，笑着说她不饿。冬天还没过完，这间出租屋就再没等来第二个春天。",
+        "npc_text": "哥哥别跑啦，我不饿，真的……",
+        "npc_state": "脸瘦得脱了形，仍把碗往你这边推",
+        "hint": "【客户线坏结局·饥寒】丢掉工作之后，两个人终究没能撑过那个冬天。"
+      },
+      "options": [],
+      "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "坏结局：没有工作，兄妹二人在拮据中饿死。"
+      },
+      "intent": {
+        "description": "客户线失业支线的饥寒坏结局：主角被开除后再没有工作，退教辅、并三餐、跑遍全城只等来『等通知』。与「被闷死」是两个不同的坏结局。",
+        "keywords": [
+          "坏结局",
+          "失业",
+          "饿死",
+          "结局"
+        ],
+        "examples": [
+          "结束",
+          "就这样吧"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "winter_hardship"
+    },
+    "n_decline": {
+      "kind": "scene",
       "priority": 70,
       "once": true,
-      "phase": { "allow": ["evening", "night", "late_night"] },
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "我捂住听筒，深吸一口气，把话说得尽量平稳：明天家里有必须到场的家长会，X 市那趟能否换人或改期。\n\n那头沉默半晌，只回一句『你自己掂量』便挂了。放下手机时，她正低头把凉掉的菜往里收，动作轻得像怕惊动什么，我忽然不确定自己是守住了她，还是又欠了她一笔。",
+        "npc_text": "……明天，哥哥真的会来吗？",
+        "npc_state": "低头收碗，睫毛颤了颤，没敢抬眼",
+        "hint": "【岔路口·推辞之后】电话挂了，屋里比刚才更安静。"
+      },
+      "options": [
+        {
+          "text": "1. 坐回去，把明天家长会的事好好跟她讲清楚。",
+          "next": "n_parent_meeting"
+        },
+        {
+          "text": "2. 什么也不想说，先把这阵沉默熬过去。",
+          "next": "n3_shut"
+        }
+      ],
+      "default_next": "n_parent_meeting",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": [
+          "numbness"
+        ],
+        "remove_tags": [
+          "grievance",
+          "suspicious"
+        ],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "推辞老板、留在家长会线；写入第一个绝望标签 numbness（麻木逃避），刻意不清除，供动态节点累积判定。"
+      },
+      "intent": {
+        "description": "家长会线开场：主角以家长会为由回绝出差。选项一直接讲清家长会，选项二把沉默交给挽回节点 n3_shut；此处写入第一个绝望标签 numbness。",
+        "keywords": [
+          "推辞",
+          "家长会",
+          "改期",
+          "沉默"
+        ],
+        "examples": [
+          "明天我真的走不开",
+          "这阵沉默先熬过去"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "street_cross"
+    },
+    "n_accept": {
+      "kind": "scene",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "『好的老板。』这五个字说出口，比想象中轻，也比想象中沉。\n\n听筒那头满意地应了一声，又交代了车次和酒店，便匆匆收了线。我回过头，她已经把我的外套从椅背上取下来，抖了抖，规规矩矩搭在臂弯里，像是在替我把明天的行程先认了下来，半句怨言也没有。",
+        "npc_text": "那我给哥哥把衬衫熨一下，明早穿。",
+        "npc_state": "抱着外套，笑得妥帖，眼底却暗了暗",
+        "hint": "【岔路口·应下之后】明早去 X 市，家长会怎么办，还压在心里。"
+      },
+      "options": [
+        {
+          "text": "1. 接下出差，明早动身去 X 市。",
+          "next": "n_trip"
+        },
+        {
+          "text": "2. 先给她留张字条，明早照旧动身。",
+          "next": "n_client_prep"
+        }
+      ],
+      "default_next": "n_trip",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [
+          "grievance",
+          "numbness",
+          "suspicious"
+        ],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "客户线开场：应下出差；清掉 numbness，客户线不累积绝望标签（避免与家长会线的「被闷死」动态结局时空错乱）。"
+      },
+      "intent": {
+        "description": "客户线开场：主角应下 X 市出差。两个选项都只在本线内推进（直接动身 / 先留字条），不再折回家长会线。",
+        "keywords": [
+          "好的老板",
+          "出差",
+          "衬衫",
+          "熨衣服"
+        ],
+        "examples": [
+          "好的老板我明早到",
+          "还是去开家长会吧"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "street_cross"
+    },
+    "n3_shut": {
+      "kind": "redemption",
+      "priority": 80,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
       "redeemable": true,
       "redeem_expire": 10,
-      "redeem_gate": { "tag": "后悔道歉" },
+      "redeem_gate": {
+        "tag": "regret"
+      },
       "presentation": {
-        "narrator": "她听完我的话，默默地放下了筷子，低声说了句：“我吃饱了。”随后站起身，转身走进了房间，重重地关上了门。",
-        "npc_text": "（门内没有任何声音，只有死一般的寂静）",
-        "npc_state": "委屈，落差极大，锁在房间里",
-        "hint": "【提示】她把自己关进了房间。你想做点什么吗？",
+        "narrator": "我把话咽回去，转身去洗碗，水声哗哗地盖住整间屋子。她没跟过来，也没回房，就坐在折叠桌旁，把没动几口的筷子并齐了又并齐。\n\n窗外天彻底黑透，玻璃上映出我们一前一后两道影子，谁都不肯先挪一步，仿佛谁先开口，这点勉强维持的体面就要碎掉。",
+        "npc_text": "……那，我先去把明天的校服找出来。",
+        "npc_state": "背对着你，肩线绷直，声音发闷",
+        "hint": "【挽回点】这阵沉默若不被挽回，会一直搁在两个人中间。",
         "redeem_variant": {
-          "narrator": "她愣愣地看着我，似乎要从我眼睛里读出什么。过了许久，她一言不发，把吃完的碗筷端进了厨房，背影显得格外单薄。",
-          "npc_text": "……（水龙头的水声一直响着）",
-          "npc_state": "委屈，失去安全感"
+          "narrator": "门被轻敲两下才推开。她没抬头，只把摞好的碗往里挪了挪，给我空出小块台面。\n\n水龙头还滴着水，一下，又一下，像在替谁数着没说出口的话。我站了一会，终于把那句『对不起』放得很轻，轻得几乎要被水声盖过去，可她还是听见了，肩膀一点点松下来。",
+          "npc_text": "……嗯，我听见了，哥哥不用再说第二遍。",
+          "npc_state": "仍低着头，指尖却悄悄攥住了你的袖口"
         }
       },
       "options": [
-        { "text": "去敲她的房门道歉。", "next": "n4_silence" },
-        { "text": "觉得很累，不想管，回房睡觉。", "next": "n6_goodnight" }
+        {
+          "text": "1. 就这样让沉默继续下去。",
+          "next": "n_hidden_breakdown"
+        }
       ],
-      "default_next": "n6_goodnight",
+      "default_next": "n_hidden_breakdown",
       "fallback_next": "n_idle",
       "effects": {
-      "add_tags": ["grievance", "loneliness"],
-        "affinity_delta": -10,
-        "summary_hint": "哥哥的话语刺痛了她，她关上了房门。"
+        "add_tags": [
+          "heartbroken"
+        ],
+        "remove_tags": [],
+        "affinity_delta": -6,
+        "set_phase": "late_night",
+        "summary_hint": "沉默熬过去；写入第二个绝望标签 heartbroken（心碎绝望）。numbness+heartbroken 同时具备即满足动态节点触发条件。"
       },
       "intent": {
-        "description": "哥哥表现出暴躁、责备、推开，或者提及工作拒绝她的好意。",
-        "keywords": ["关你什么事", "别问", "烦", "不用你管", "客户"],
-        "examples": ["关你什么事", "别做了，我明天要见客户", "烦死了"],
-        "negatives": ["对不起", "累", "吃清淡"]
-      }
+        "description": "家长会线挽回点：长时间沉默，妹妹背对主角找校服。继续沉默将经 n_hidden_breakdown 折入深夜；此处写入第二个绝望标签 heartbroken。",
+        "keywords": [
+          "沉默",
+          "洗碗",
+          "校服",
+          "对不起",
+          "后悔"
+        ],
+        "examples": [
+          "……算了",
+          "我先去睡了",
+          "对不起，刚才不该那样"
+        ],
+        "negatives": [
+          "没什么好说的"
+        ],
+        "must_freeform": false
+      },
+      "background": "street_return"
     },
     "n4_silence": {
+      "kind": "scene",
+      "priority": 55,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "夜一点点沉下去，桌上的汤早凉了，她却仍保持着那个姿势，像被谁忘在原地的小小雕像。\n\n我几次想开口，话都在舌尖打了转又缩回去，最后只把台灯拧暗一档。也就在这片安静里，后知后觉的懊悔慢慢浮上来——明明舍不得她，偏偏总把最难听的沉默留给她。",
+        "npc_text": "……（她把椅子往你这边挪了半寸，又停住）",
+        "npc_state": "盯着自己的手背，眼圈泛红",
+        "hint": "【深夜】懊悔浮了上来，这句话该说给谁听，你其实清楚。"
+      },
+      "options": [],
+      "default_next": "n_reconcile",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": [
+          "regret"
+        ],
+        "remove_tags": [],
+        "affinity_delta": -3,
+        "set_phase": "night",
+        "summary_hint": "长夜沉默中浮起懊悔，写入 regret 标签，喂给 n3_shut 的 redeem_gate。"
+      },
+      "intent": {
+        "description": "沉默场景：夜深、汤凉、妹妹像被忘在原地的雕像，主角几次欲言又止，后知后觉的懊悔浮起；此处写入 regret 标签，专门喂给 n3_shut 的 redeem_gate 以支撑 PendingPool 挽回。",
+        "keywords": [
+          "沉默",
+          "台灯",
+          "懊悔",
+          "后悔"
+        ],
+        "examples": [
+          "我什么都不想说",
+          "（沉默）"
+        ],
+        "negatives": [
+          "晚安",
+          "没事了"
+        ],
+        "must_freeform": false
+      },
+      "background": "night_room"
+    },
+    "n_reconcile": {
       "kind": "scripted",
       "priority": 55,
       "once": true,
-      "phase": { "allow": ["evening", "night", "late_night"] },
-      "presentation": {
-        "narrator": "餐桌上只剩下沉默。我没有说话，她也没有动。房间里安静得能听到窗外树叶摩擦的声音。",
-        "npc_text": "……（她坐在原地，手指不安地绞在一起）",
-        "npc_state": "沉默，不知所措",
-        "hint": "【提示】你可以直接对她说点什么，打破沉默。"
-      },
-      "options": [
-        { "text": "继续沉默。", "next": "n6_goodnight" }
-      ],
-      "default_next": "n6_goodnight",
-      "fallback_next": "n_idle",
-      "effects": {
-      "add_tags": ["regret"],
-        "affinity_delta": -3,
-        "set_phase": "night",
-        "summary_hint": "长时间的沉默，哥哥开始后悔；天黑了。"
-      },
-      "intent": {
-        "description": "长时间的沉默、回避、不说话，或双方一时无话可说。",
-        "keywords": ["沉默", "不说话", "……"],
-        "examples": ["（沉默）", "我什么都不想说"],
-        "negatives": ["晚安", "对不起"]
-      }
-    },
-    "n5_tender": {
-      "kind": "scripted",
-      "priority": 75,
-      "once": true,
-      "requires": { "step_lte": 8 },
-      "phase": { "allow": ["evening", "night", "late_night"] },
-      "presentation": {
-        "narrator": "听到我的关心或病态的偏爱，她给我夹了更多的菜。我们享用了一顿看似丰盛温馨的晚餐。她看着我，眼神里满是沉甸甸的依恋。",
-        "npc_text": "哥哥最好了……只要哥哥不离开我，我做什么都可以。",
-        "npc_state": "信任，极度依恋，放松",
-        "hint": "【提示】她此刻显得极度信任你。",
-        "redeem_variant": {
-          "narrator": "她停下了动作，眼眶微红，似乎没想到我会这么说。",
-          "npc_text": "……真的吗？哥哥真的只在乎我吗？",
-          "npc_state": "感动，却又患得患失"
-        }
-      },
-      "options": [
-        { "text": "摸摸她的头，安抚她。", "next": "n6_goodnight" }
-      ],
-      "default_next": "n6_goodnight",
-      "fallback_next": "n_idle",
-      "effects": {
-               "add_tags": ["deeply_touched", "trust"],
-        "affinity_delta": 8,
-        "summary_hint": "哥哥给出了关心与偏爱，她感到信任与满足。"
-      },
-      "intent": {
-        "description": "哥哥给出安抚、关心，或表达出病态的爱意与占有欲，让她感到被在乎。",
-        "keywords": ["只在乎你", "只爱你", "别怕", "保护", "喂我"],
-        "examples": ["我只在乎你", "别乱想，我只爱你一个人", "你胃不好，吃点清淡的"],
-        "negatives": ["不用你管", "别管", "算了"]
-      }
-    },
-    "n6_goodnight": {
-      "kind": "scripted",
-      "priority": 50,
-      "once": true,
-      "requires": {
-        "any": [
-          { "phase_in": ["night", "late_night"] },
-          { "affinity_lte": 85 }
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
         ]
       },
-      "phase": { "allow": ["evening", "night", "late_night"] },
       "presentation": {
-        "narrator": "夜深了。我站起身准备回房休息。她默默收拾着碗筷，在我转身的瞬间，轻声开口。",
-        "npc_text": "……晚安，哥哥。明天，也要早点回来。",
-        "npc_state": "不舍，盯着你的背影",
-        "hint": "【提示】今晚就到这里了。"
+        "narrator": "天快亮时我终于把台灯关了。她不知什么时候靠在沙发扶手上睡著，手里还攥着那张家长会的通知，纸角被捏得发皱。\n\n我轻轻把它抽出来，铺平，压回桌角，又把外套搭到她肩上。有些话错过了一整夜，可只要明天还坐进那间教室，就总还来得及重新起个头。",
+        "npc_text": "（睡梦里含糊地）……哥哥，别迟到。",
+        "npc_state": "攥着通知蜷在扶手边，睫毛还湿着",
+        "hint": "【回程】你可以直接走向明天，也可以回头，把那阵沉默好好接住。"
       },
       "options": [
-        { "text": "回房。", "next": "end_peace" }
+        {
+          "text": "1. 不再回头，安心准备明天的家长会。",
+          "next": "n_parent_meeting"
+        },
+        {
+          "text": "2. 折回去，把昨晚没说完的话补上。",
+          "next": "n3_shut"
+        }
       ],
-      "default_next": "end_peace",
-      "fallback_next": "end_emptiness",
+      "default_next": "n_parent_meeting",
+      "fallback_next": "n_idle",
       "effects": {
+        "add_tags": [],
+        "remove_tags": [],
         "affinity_delta": 2,
-        "summary_hint": "夜深了，准备休息。"
+        "set_phase": "",
+        "summary_hint": "天亮前铺平通知；提供回程选项，可走进被唤醒的 n3_shut。"
       },
       "intent": {
-        "description": "哥哥准备去睡觉、结束今晚的对话。",
-        "keywords": ["晚安", "睡了", "困了", "回房"],
-        "examples": ["我先去睡了", "晚安"],
-        "negatives": ["等一下"]
-      }
+        "description": "回程纯叙述：天亮前主角把被捏皱的家长会通知铺平压回桌角，给妹妹搭上外套。选项一走向家长会线，选项二折回并走进被 regret 唤醒的 n3_shut，形成 PendingPool 挽回的回程入口。",
+        "keywords": [
+          "回程",
+          "家长会",
+          "通知",
+          "折回去"
+        ],
+        "examples": [
+          "明天直接去学校",
+          "还是回去把话说清楚"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "street_return"
+    },
+    "n_parent_meeting": {
+      "kind": "scene",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "第二天上午的教室比想象中亮，日光灯把一排排小课桌照得发白。\n\n我坐在那个属于『家长』的位置上，听班主任念到她稳在前几名，只是近来作文里总写些过于安静的句子。摊开的成绩单边角平整，我忽然想起她昨晚捏皱的那张通知，心里一软，又有点发酸。",
+        "npc_text": "哥哥，老师没为难你吧？",
+        "npc_state": "攥着书包带，踮脚往教室里张望",
+        "hint": "【岔路口·家长会】散会了，接下来怎么和她走这段路，由你决定。"
+      },
+      "options": [
+        {
+          "text": "1. 把成绩单递给她，说一句『我一直在』。",
+          "next": "end_peace"
+        },
+        {
+          "text": "2. 只点点头，说些『还行、别骄傲』之类的话。",
+          "next": "end_emptiness"
+        }
+      ],
+      "default_next": "end_peace",
+      "fallback_next": "n_idle",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 2,
+        "set_phase": "next_day",
+        "summary_hint": "期中考家长会散会，成绩稳居前列，兄妹在教室门口对话。"
+      },
+      "intent": {
+        "description": "家长会线主场景：第二天上午主角坐进教室听班主任念期中成绩，妹妹在门口踮脚张望。选项一通向普通和解结局 end_peace，选项二通向遗憾结局 end_emptiness。",
+        "keywords": [
+          "家长会",
+          "成绩单",
+          "班主任",
+          "教室"
+        ],
+        "examples": [
+          "成绩单给你，我一直在",
+          "还行，别骄傲"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "school"
     },
     "end_peace": {
       "kind": "ending",
       "priority": 60,
-      "requires": {
-        "all": [
-          { "phase_in": ["night", "late_night"] },
-          { "affinity_gte": 82 }
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
         ]
       },
       "presentation": {
-        "narrator": "这一夜，她似乎睡得很安稳。我推开房门时，还能听到她房间里传来的均匀呼吸声。我们都在这个家里，找到了短暂的平静。",
-        "npc_text": "（房间里传来细微的呢喃）哥哥……不要走……",
-        "npc_state": "安睡",
-        "hint": "【结局·平静】"
+        "narrator": "回家路上她走在我半步之后，忽然伸手勾住我外套的袖口，像四年前那个雨天我向她伸手时一样。\n\n我把成绩单折好塞进她书包，没说漂亮话，只问晚上想不想加个荷包蛋。她愣了愣，笑出声来，声音很轻，却把这一整天的日光灯、折叠桌和凉汤都一并焐热了。",
+        "npc_text": "要两个……不对，一个就够，哥哥也吃。",
+        "npc_state": "勾着袖口，脚步比来时轻快许多",
+        "hint": "【普通结局·和解】日子还是紧，但两个人总算又走在同一边。"
       },
-      "options": [
-        { "text": "结束演出。", "next": "-1" }
-      ],
+      "options": [],
       "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 5,
+        "set_phase": "",
+        "summary_hint": "普通结局：兄妹和解，日子仍紧却重新走在同一边。"
+      },
       "intent": {
-        "description": "今夜到此为止：彼此都没有受伤，安然入睡。",
-        "keywords": ["结束", "睡吧", "晚安"],
-        "examples": ["晚安", "睡个好觉"],
-        "negatives": []
-      }
+        "description": "普通结局（兄妹和解）：回家路上妹妹重新勾住哥哥的袖口，一句加荷包蛋的寻常问话把整天的局促都焐热；终局指向 -1。",
+        "keywords": [
+          "结局",
+          "和解",
+          "荷包蛋",
+          "袖口"
+        ],
+        "examples": [
+          "回家吧",
+          "晚上加个蛋"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "street_return"
     },
     "end_emptiness": {
       "kind": "ending",
       "priority": 90,
-      "requires": {
-        "all": [
-          { "any": [{ "tag": "后悔道歉" }, { "step_gte": 9 }] },
-          { "affinity_lte": 81 }
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
         ]
       },
       "presentation": {
-        "narrator": "她站在水池边，看着水流冲刷着盘子。我回了房间，没有再回头。厨房的灯一直亮到天亮。那些没有被安抚的落差和委屈，像疯长的藤蔓一样，在沉默中缠绕。",
-        "npc_text": "……（她把水龙头关掉，靠在冰凉的瓷砖上，慢慢滑落蹲下）",
-        "npc_state": "绝望，落差，委屈",
-        "hint": "【结局·虚空】"
+        "narrator": "成绩单被我随手卷进口袋，散会的人潮把我们挤到楼梯两侧。\n\n她几次想开口，最后只说『那我先回教室了』，便抱着书包转身，走得比平时快。傍晚我照旧做饭，她照旧说吃饱了，碗筷照旧摞得整齐。日子一天天照旧过下去，只是那张通知再没被谁提起，像从来没存在过。",
+        "npc_text": "……我没事的，哥哥忙你的就好。",
+        "npc_state": "抱着书包快步走开，没回头",
+        "hint": "【遗憾结局】谁都没有受伤，可谁也没有被好好接住。"
+      },
+      "options": [],
+      "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": -2,
+        "set_phase": "",
+        "summary_hint": "家长会线专属遗憾结局：一切照旧，未解开的心结被永久搁置。"
+      },
+      "intent": {
+        "description": "家长会线遗憾结局：家长会后兄妹被人潮挤开，妹妹快步回教室，此后日子照旧却再没人提起那张通知。此结局只由 n_parent_meeting 选项二到达，客户线不再复用。",
+        "keywords": [
+          "结局",
+          "遗憾",
+          "照旧",
+          "算了"
+        ],
+        "examples": [
+          "算了，当我没说",
+          "没什么要紧的"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "street_return"
+    },
+    "n_trip": {
+      "kind": "scripted",
+      "priority": 50,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "天没亮我挤上去 X 市的首班车，把那叠客户资料又翻了一遍，纸边被手汗浸得发软。\n\n窗外从低矮的出租屋慢慢换成成片高楼，玻璃上映出我刻意抻平的领口。昨天那通电话、她没问出口的家长会，都被车轮一格格碾在身后，只剩这单还没着落的合作在眼前晃。",
+        "npc_text": "（广播）前方到站 X 市，请整理随身物品。",
+        "npc_state": "合上资料，指腹把封面压了又压",
+        "hint": "【第二天·出差】车到 X 市，见面之前先把自己收拾得像样些。",
+        "speaker": "广播"
+      },
+      "options": [],
+      "default_next": "n_client_meet",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "next_day",
+        "summary_hint": "前往 X 市的城际列车上，主角反复翻看客户资料。"
+      },
+      "intent": {
+        "description": "出差办公线开场：第二天清早乘首班车前往 X 市，反复翻看客户资料，出租屋与家长会都被车轮碾在身后；承接后进入与青年女客户的会面。",
+        "keywords": [
+          "X 市",
+          "出差",
+          "城际",
+          "客户资料"
+        ],
+        "examples": [
+          "到了给我发个消息",
+          "资料再核对一遍"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_meet": {
+      "kind": "scripted",
+      "priority": 50,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "客户比我想的年轻，身材很好，一身剪裁利落的浅色西装，说话总先微微欠身，把『麻烦您了』挂在句首。\n\n百叶帘滤进一层柔光，她逐条确认了范围、节点和预算，笔尖点得又轻又稳，没有多余寒暄，也没有半点居高临下。合上文件夹，她抬眼笑问要不要一起吃个便饭。",
+        "npc_text": "条款就按刚才定的，辛苦您跑这一趟。",
+        "npc_state": "合上文件夹欠身，笑意分寸得当",
+        "hint": "【会面】合作谈得很顺，她客气地请了一顿饭。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "n_client_meal",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "身材很好的青年女客户十分客气地谈完合作，并请主角吃饭。"
+      },
+      "intent": {
+        "description": "会面纯叙述：客户是身材非常好的青年女人，十分客气地逐条确认合作范围、交付节点与预算，谈完后请主角吃饭；承接后进入饭桌场景。",
+        "keywords": [
+          "客户",
+          "合作",
+          "条款",
+          "便饭"
+        ],
+        "examples": [
+          "条款就按刚才定的",
+          "一起吃个便饭吧"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_meal": {
+      "kind": "scene",
+      "priority": 65,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "餐厅临街，她把靠窗的位置让给我，点菜时先问了忌口才慢慢翻完菜单。\n\n菜上齐，她替我添了半杯茶，随口问是不是刚毕业出来找工作。我愣了一下，老实答还在实习，这趟是跟前辈来见世面的。她点点头，没露半点轻视，只把筷架往我这边推了推，气氛松得像老同事。",
+        "npc_text": "刚毕业找的工作吗？别紧张，随口问问。",
+        "npc_state": "添茶托腮，语气松弛而不设防",
+        "hint": "【饭桌】她问起工作，你答了『在实习』，话头还没停。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "n_client_question",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [
+          "shyness",
+          "regret",
+          "relieved"
+        ],
+        "remove_tags": [],
+        "affinity_delta": 2,
+        "set_phase": "next_evening",
+        "summary_hint": "饭桌上被问『是不是刚毕业找的工作』，主角答『在实习』；写入 H-C 三标签。"
+      },
+      "intent": {
+        "description": "饭桌场景：客户请吃饭，客气地问『是不是刚毕业找的工作吗』，主角老实回答『在实习』；此处一次性写入 shyness/regret/relieved 三个标签，作为 H-C 隐藏节点的铺垫。",
+        "keywords": [
+          "刚毕业",
+          "实习",
+          "找工作",
+          "添茶"
+        ],
+        "examples": [
+          "我还在实习",
+          "跟着前辈来见见世面"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_question": {
+      "kind": "scene",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "窗外天色转成薄橘，服务生收走了汤碗。\n\n她把茶杯轻轻搁下，忽然抬眼，问得比刚才认真了些：那这一单，对你来说是不是很重要。问完便安静地等，没催，也没替我补台阶，只把目光稳稳落在我脸上。我攥了攥餐巾，明白这句话后面还留着一扇没推开的门。",
+        "npc_text": "这一单对你来说，是不是很重要？",
+        "npc_state": "搁下茶杯，目光平稳地落在你脸上",
+        "hint": "【岔路口·饭桌】她问得认真，答与不答，会把今晚带去不同的地方。",
+        "speaker": "客户"
       },
       "options": [
-        { "text": "结束演出。", "next": "-1" }
+        {
+          "text": "1. 承认如果做成，大致就能转正。",
+          "next": "n_client_line"
+        },
+        {
+          "text": "2. 笑着摇头，说这个不方便讲。",
+          "next": "n_client_refuse"
+        },
+        {
+          "text": "3. 想表现得漂亮些，话说得满了。",
+          "next": "n_hidden_client_disgust"
+        }
       ],
-      "default_next": "-1",
+      "default_next": "n_client_line",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "客户线分岔：三条支线各自独立，不与家长会线共享任何后续节点。"
+      },
       "intent": {
-        "description": "今夜到此为止：带着没有解开的心结和落差结束。",
-        "keywords": ["算了", "当我没说", "没什么"],
-        "examples": ["算了，当我没说", "没什么要紧的"],
-        "negatives": ["对不起", "累"]
-      }
+        "description": "客户线关键提问：客户问这一单重不重要。三个选项全部落在本线内：坦白转正 / 拒绝回答 / 话说得满导致客户转冷。",
+        "keywords": [
+          "这一单",
+          "重要",
+          "转正",
+          "不方便讲"
+        ],
+        "examples": [
+          "做成的话大概能转正",
+          "这个不太方便说"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_hidden_client_disgust": {
+      "kind": "scene",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "话一出口我就听出不对——坐姿摆得太松弛，笑也递得太满，句子里硬塞进几句自以为漂亮的自嘲，还添了句『以后常来 X 市就好』。\n\n她没接茬，只把茶杯往回挪半寸，指尖在杯沿停了一瞬。那点客气还在，却像被抽走一层，饭桌上忽然有了分寸之外的凉意。",
+        "npc_text": "……您挺会聊的，我们还是聊条款吧。",
+        "npc_state": "笑意收住，身体不着痕迹地往后靠",
+        "hint": "【客户线·话说得满了】她的分寸感立刻冷了下去。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "n_client_cold",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [
+          "shyness",
+          "regret",
+          "relieved"
+        ],
+        "affinity_delta": -8,
+        "set_phase": "",
+        "summary_hint": "客户线静态分支：说话过于带目的性，客户转冷；清掉饭桌三标签，不再写入孤儿标签 disgust。"
+      },
+      "intent": {
+        "description": "客户线第三支线（静态）：n_client_question 选项三的落点。回复里带了太多目的性，客户用『您』和『条款』把距离重新量了一遍；之后经 n_client_cold 导向丢单与失业线。",
+        "keywords": [
+          "表现一下",
+          "常来",
+          "暧昧",
+          "话说满了"
+        ],
+        "examples": [
+          "以后常来 X 市就好",
+          "那我可要好好表现"
+        ],
+        "negatives": [
+          "做成能转正",
+          "不方便讲"
+        ],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_cold": {
+      "kind": "scripted",
+      "priority": 55,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "剩下的半顿饭吃得规矩而短。她合上菜单，重新用『您』和『条款』把话框回原处，添茶也改叫了服务生。\n\n我几次想把气氛捞回来，都被那层不轻不重的客气稳稳挡住。走出餐厅时她先一步伸手拦了车，欠身道别，分寸挑不出半点错，可我清楚，刚才那扇门已经关上了。",
+        "npc_text": "合作的事按流程走，就不多留您了。",
+        "npc_state": "欠身，目光礼貌地掠过，没有停留",
+        "hint": "【厌恶生效】她没失礼，只是把距离重新量了一遍。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "n_deal_lost",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": -8,
+        "set_phase": "",
+        "summary_hint": "客户线：客户转冷，礼貌收场；承接后进入丢单与失业线，不再落到家长会线结局。"
+      },
+      "intent": {
+        "description": "客户线转冷场景：她用『您』和『条款』把话框回原处。承接后经 n_deal_lost → n_fired → end_bad_starve，构成客户线自己的失业坏结局链。",
+        "keywords": [
+          "转冷",
+          "条款",
+          "分寸",
+          "道别"
+        ],
+        "examples": [
+          "刚才是我冒昧了",
+          "按流程走就好"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_refuse": {
+      "kind": "scene",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "我笑了笑，说这个不方便讲，把话头轻轻拨回菜上。\n\n她也不追问，只『嗯』了一声替我续上茶，话题便顺着窗外街景滑了过去。可那一瞬的空白还是留了下来，像本该落笔处空了一行。之后照样把饭吃完，照样客气道别，只是谁都没再提『转正』两个字。",
+        "npc_text": "也是，是我冒昧了……这家的鱼不错，尝尝？",
+        "npc_state": "点头收住话头，笑意淡了半分",
+        "hint": "【拒绝回答】你守住了分寸，也把那扇门留在了原地。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "end_client_regret",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [
+          "shyness",
+          "regret",
+          "relieved"
+        ],
+        "affinity_delta": -2,
+        "set_phase": "",
+        "summary_hint": "客户线拒绝回答支线：清掉饭桌三标签，收束到本线独立结局。"
+      },
+      "intent": {
+        "description": "客户线拒绝回答：主角笑称不方便讲，把话头拨回菜上。承接后进入本线独立结局 end_client_regret，不再落到家长会线的遗憾结局。",
+        "keywords": [
+          "不方便讲",
+          "拒绝回答",
+          "冒昧",
+          "尝尝"
+        ],
+        "examples": [
+          "这个不太方便说",
+          "先吃菜吧"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_line": {
+      "kind": "scene",
+      "priority": 75,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "我索性实说：还在实习，这一单真做成，大致就能转正。\n\n她听罢没笑，也没急着鼓励，只把茶杯转了半圈，慢慢讲起自己刚入行时也是这样，把每一单都当成能不能留下来的答卷。窗外薄橘沉成深蓝，她说话声音不高，却把『我懂』两个字放得很实在。",
+        "npc_text": "那就更该把它做好，别急着证明什么。",
+        "npc_state": "转着茶杯，语气比先前更平实",
+        "hint": "【岔路口·青年客户线】坦白之后，这条线才真正开始。",
+        "speaker": "客户"
+      },
+      "options": [
+        {
+          "text": "1. 顺着话头，听她把那几年的事讲完。",
+          "next": "n_client_line_2"
+        },
+        {
+          "text": "2. 点到为止，起身道别。",
+          "next": "end_client_farewell"
+        }
+      ],
+      "default_next": "n_client_line_2",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [
+          "shyness",
+          "regret",
+          "relieved"
+        ],
+        "affinity_delta": 3,
+        "set_phase": "",
+        "summary_hint": "客户线坦白支线：选项二收束到本线独立的「点到为止」结局，不复用青年客户线结局。"
+      },
+      "intent": {
+        "description": "客户线坦白支线开场：承认做成大致能转正。选项一展开青年客户线，选项二直接收束到本线独立结局。",
+        "keywords": [
+          "转正",
+          "实习",
+          "青年客户线",
+          "答卷"
+        ],
+        "examples": [
+          "做成的话大概能转正",
+          "听您再讲讲"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_client_line_2": {
+      "kind": "scripted",
+      "priority": 50,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "那顿饭后来吃了很久。她讲第一次独自见客户把资料拿反，讲加班到末班车的站台，也讲清一件事：能不能转正靠交付，不靠饭桌上的漂亮话。\n\n临走她把记着待确认事项的便签推给我，字写得干净，末了还画了个小小的对勾。我走出门，风一吹，倒比来时踏实许多。",
+        "npc_text": "这几条周一前回我就行，别熬夜赶。",
+        "npc_state": "把便签推来，顺手替你按住门",
+        "hint": "【青年客户线】分寸一直都在，反倒让人松了口气。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "end_client_line",
+      "fallback_next": "n_client_question",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 3,
+        "set_phase": "next_evening",
+        "summary_hint": "青年客户线展开：她讲完自己刚入行的旧事，留下写着待办事项的便签。"
+      },
+      "intent": {
+        "description": "青年客户线展开纯叙述：客户讲第一次见客户拿反资料、加班到末班车，点明能否转正靠交付而非漂亮话，临走推来一张画着对勾的便签；承接后进入本线结局。",
+        "keywords": [
+          "便签",
+          "交付",
+          "末班车",
+          "周一前"
+        ],
+        "examples": [
+          "周一前回您",
+          "别熬夜赶"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "end_client_line": {
+      "kind": "ending",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "回程车上我把便签夹进资料第一页，把明天的闹钟往前调了半个钟头。\n\n手机亮了一下，是她发来的『到家说一声』，我回『在路上了』，顺手把家长会通知也翻出来压回床头。合作才开头，日子也还紧，可这一趟我总算明白：把话答得老实一点，路反而走得稳一点。",
+        "npc_text": "（消息）哥哥，汤给你留着，别太晚。",
+        "npc_state": "靠着车窗，把便签压得平平整整",
+        "hint": "【青年客户线结局】分寸与坦白，换来了往前走的一小步。"
+      },
+      "options": [],
+      "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 3,
+        "set_phase": "",
+        "summary_hint": "青年客户线结局：坦白与分寸换来一个踏实的开头。"
+      },
+      "intent": {
+        "description": "青年客户线结局：只由 n_client_line_2 到达（便签确在该节点产生），回程车上把便签夹进资料、把闹钟调早。不与其他支线共享。",
+        "keywords": [
+          "结局",
+          "便签",
+          "回程",
+          "到家说一声"
+        ],
+        "examples": [
+          "在路上了",
+          "明天再对一遍条款"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
     },
     "n_idle": {
       "kind": "fallback",
       "priority": 10,
       "once": false,
       "cooldown": 1,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
       "presentation": {
-        "narrator": "我没有说话。钟表秒针走动的声音在客厅里被无限放大。",
+        "narrator": "话到一半停住了。客厅里只剩钟表秒针一格一格地走，把这点空落落的时间拉得又细又长。\n\n她没催，也没走开，就抱着膝盖坐在沙发另一头，时不时往我这边看一眼，像在等一个随时可能落下来的开头。我低头搓了搓手，一时竟不知道该从哪句接回去。",
         "npc_text": "……哥哥？你今天，到底怎么了？",
-        "npc_state": "等待",
-        "hint": "【提示】你可以直接对她说点什么。"
+        "npc_state": "抱着膝盖，眼睛一下下往你这边瞟",
+        "hint": "【兜底】话停在这儿了，你可以直接说点什么，把话题接回去。"
       },
       "options": [
-        { "text": "回去继续刚才的话题。", "next": "n6_goodnight" }
+        {
+          "text": "1. 回去继续刚才的话题。",
+          "next": "n_reconcile"
+        }
       ],
-      "default_next": "n6_goodnight",
+      "default_next": "n_reconcile",
       "effects": {
-        "summary_hint": "两个人都没有开口。"
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "两个人都没有再开口，话题暂时悬在半空。"
       },
       "intent": {
-        "description": "无明确意图时的保底闲聊，防止玩家无路可走导致死锁。",
+        "description": "无明确意图时的保底闲聊，防止玩家无路可走导致死锁；出边指向回程枢纽 n_reconcile。",
         "keywords": [],
-        "examples": ["……"],
+        "examples": [
+          "……"
+        ],
         "negatives": [],
         "must_freeform": true
-      }
+      },
+      "background": "apartment_eve"
     },
     "-1": {
       "kind": "ending",
@@ -350,11 +1362,316 @@
       "options": [],
       "default_next": "",
       "intent": {
-        "description": "终末占位节点（Terminal）。",
+        "description": "终末占位节点（Terminal）：空 options、空 default_next，所有结局统一指向此处收束。",
         "keywords": [],
         "examples": [],
         "negatives": []
+      },
+      "background": "apartment_eve"
+    },
+    "n_client_prep": {
+      "kind": "scene",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "我找出便签纸，写了句『家长会我记着，回来补上』，压在她书包侧袋里。字丑，话也短，可总比什么都不留强。\n\n她已经蜷在沙发上睡了，台灯没关，衬衫熨好搭在椅背上，袖口抚得平平整整。我把外套拎起来，关门时放轻了手，楼道里的声控灯还是亮了一下。",
+        "npc_text": "（睡梦里含糊地）……哥哥，路上慢点。",
+        "npc_state": "蜷在沙发上，手边还压着那张家长会通知",
+        "hint": "【客户线·出发前】留了字条，明早照旧去 X 市。"
+      },
+      "options": [
+        {
+          "text": "1. 把字条压好，出门。",
+          "next": "n_trip"
+        }
+      ],
+      "default_next": "n_trip",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 1,
+        "set_phase": "next_day",
+        "summary_hint": "客户线内部过场：出发前留字条，只在客户线内推进，不折回家长会线。"
+      },
+      "intent": {
+        "description": "客户线出发前的静态过场：主角给妹妹留字条，妹妹已熨好衬衫睡下。唯一出口是 n_trip，全程留在本线内。",
+        "keywords": [
+          "字条",
+          "衬衫",
+          "出发",
+          "X 市"
+        ],
+        "examples": [
+          "明早照旧动身",
+          "把字条压好"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "night_room",
+      "fallback_next": "n_client_question"
+    },
+    "n_deal_lost": {
+      "kind": "scripted",
+      "priority": 55,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "第二天上午的电话比预想中短。前台转来老板的声音，说客户那边把合作按流程停了，理由写得很客气，没有一句能反驳。\n\n我站在酒店大堂，把手机从耳边拿下来，屏幕上还压着昨夜那句『到家说一声』。回程车票改签了两次，最后选了最便宜的一班。",
+        "npc_text": "（电话）这一单先不推进了，你回来再说。",
+        "npc_state": "攥着手机，指节发白，没立刻答话",
+        "hint": "【客户线·丢单】合作停了，回去的路也短了。",
+        "speaker": "老板"
+      },
+      "options": [],
+      "default_next": "n_fired",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": -6,
+        "set_phase": "",
+        "summary_hint": "客户线静态节点：客户转冷导致合作终止，导向 n_fired 与本线饥寒坏结局。"
+      },
+      "intent": {
+        "description": "客户线丢单节点（静态）：老板来电告知合作按流程停止，主角改签最便宜的一班车回程。承接 n_client_cold，导向 n_fired → end_bad_starve。",
+        "keywords": [
+          "丢单",
+          "合作停了",
+          "改签",
+          "回程"
+        ],
+        "examples": [
+          "我知道了",
+          "按流程走"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz",
+      "fallback_next": "n_client_question"
+    },
+    "end_client_farewell": {
+      "kind": "ending",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "我没有再往下接，只把茶杯放回碟里，起身道了别。她也不留，欠身送到门口，分寸挑不出半点错。\n\n回程的车上，X 市的灯一盏盏往后退。手机亮过一次，是妹妹问几点到家，我回『别等我，先睡』，又把那张家长会通知从包里翻出来，看了很久，最后仍压回最底下。\n\n这一单没有谈成什么，也没有谈崩什么。只是有些话，和昨晚一样，终究没被谁接住。",
+        "npc_text": "（消息）哥哥，汤给你留着，别太晚。",
+        "npc_state": "靠着车窗，指腹在通知边角停了很久",
+        "hint": "【客户线结局·点到为止】话说得客气，路也走得稳当。",
+        "speaker": "木子因"
+      },
+      "options": [],
+      "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "客户线独立结局：点到为止的道别，只由 n_client_line 选项二到达。"
+      },
+      "intent": {
+        "description": "客户线独立结局（点到为止）：主角起身道别，回程车上翻出家长会通知又压回包底。此结局只由 n_client_line 选项二到达，不与其他支线共享、不复用便签剧情。",
+        "keywords": [
+          "结局",
+          "道别",
+          "点到为止",
+          "回程"
+        ],
+        "examples": [
+          "先走了",
+          "今天就到这儿"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "end_client_regret": {
+      "kind": "ending",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "那顿饭最后还是吃完了，客气，周全，谁都没有失礼。\n\n送她上车后我一个人沿街走回酒店，X 市的风比家里干，吹得人清醒。前台递来一张便条，说有位先生来过电话，问明天能否再补一次面谈。我捏着那张纸站在大堂，忽然想起出门前压在书包侧袋里的字条，不知道她看见没有。\n\n第二天照常返程，合作照常按流程走。只是『转正』两个字，那晚之后再没人提过。",
+        "npc_text": "……（她没有再发消息）",
+        "npc_state": "站在酒店大堂，捏着便条没动",
+        "hint": "【客户线结局·留在原地】分寸守住了，那扇门也留在了原地。",
+        "speaker": "客户"
+      },
+      "options": [],
+      "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": -2,
+        "set_phase": "",
+        "summary_hint": "客户线独立结局：拒绝回答支线的落点，只由 n_client_refuse 到达。"
+      },
+      "intent": {
+        "description": "客户线独立结局（拒绝回答）：饭局客气收场，回酒店后收到补谈便条；合作按流程走，转正再没人提起。此结局只由 n_client_refuse 到达，不与家长会线共享。",
+        "keywords": [
+          "结局",
+          "拒绝回答",
+          "转正",
+          "按流程"
+        ],
+        "examples": [
+          "这个不太方便说",
+          "先吃菜吧"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "city_biz"
+    },
+    "n_hidden_smother": {
+      "kind": "emergent",
+      "priority": 70,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "屋里静得能听见钟摆。她站在床边很久，久到我以为她只是来替我掖被角。\n\n后来那床薄被轻轻覆上来，带着她身上总也散不掉的凉意。我起初以为是自己太累了，直到胸口那点重量一点点压实，才发觉她的手一直没松开，指尖抖得厉害，却始终没有停。\n\n她没哭，也没说话。眼睛里什么都没有了，像一盏灯被谁从里面拧灭。",
+        "npc_text": "……哥哥，这样就不用再等明天了。",
+        "npc_state": "俯身，双手按在被角上，眼神空得没有一点光",
+        "hint": "【坏结局·被闷死】两个绝望摞在一起，这间屋子再也等不到天亮。",
+        "speaker": "木子因"
+      },
+      "options": [
+        {
+          "text": "（眼前的光一点点暗下去……）",
+          "next": "end_bad_smother"
+        }
+      ],
+      "default_next": "end_bad_smother",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [
+          "numbness",
+          "heartbroken"
+        ],
+        "affinity_delta": -20,
+        "set_phase": "",
+        "summary_hint": "唯一动态节点：numbness+heartbroken 两个绝望标签同时具备即触发；自我清轨避免重复拉取。"
+      },
+      "intent": {
+        "description": "唯一保留的动态节点，初始化于 n_boss_call（老板对话后的第一个分支节点）。当玩家在家长会线累积到 2 个绝望标签（numbness 麻木逃避 + heartbroken 心碎绝望）时被拉取，导向坏结局 end_bad_smother。客户线刻意不写入这两个标签，以免出差在外却触发家中结局造成时间错乱。",
+        "keywords": [
+          "绝望",
+          "沉默",
+          "算了",
+          "没意义",
+          "不用等了"
+        ],
+        "examples": [
+          "……算了",
+          "没什么是要紧的",
+          "不用等明天了"
+        ],
+        "negatives": [
+          "对不起",
+          "我想想办法"
+        ],
+        "must_freeform": true
+      },
+      "background": "night_room",
+      "fallback_next": "n_idle",
+      "early_trigger": {
+        "tags_all": [
+          "numbness",
+          "heartbroken"
+        ],
+        "min_step": 2,
+        "require_node": "n_boss_call"
       }
+    },
+    "end_bad_smother": {
+      "kind": "ending",
+      "priority": 60,
+      "once": true,
+      "phase": {
+        "allow": [
+          "evening",
+          "night",
+          "late_night",
+          "next_day",
+          "next_evening"
+        ]
+      },
+      "presentation": {
+        "narrator": "天亮时楼道里有人上班，那扇门没开，灯也没亮。\n\n桌子上的碗筷还摞得整齐，汤结着一层薄薄的膜；那张家长会的通知被压在桌角，边角平整，像从来没有人捏皱过它。她坐在床沿，抱着自己的手，指节收得发白，一整天都没有动。\n\n窗外的天光慢慢移到地上，又慢慢退走。屋里没有一点颜色，也没有一点声音。",
+        "npc_text": "（没有说话）",
+        "npc_state": "坐着不动，瞳孔里没有光，脸上没有表情",
+        "hint": "【坏结局·被闷死】绝望攒够了，故事停在这一夜。",
+        "speaker": "木子因"
+      },
+      "options": [],
+      "default_next": "-1",
+      "effects": {
+        "add_tags": [],
+        "remove_tags": [],
+        "affinity_delta": 0,
+        "set_phase": "",
+        "summary_hint": "坏结局·被闷死：唯一动态分支的收束点，正文演完后经 default_next 汇入 -1 结束。"
+      },
+      "intent": {
+        "description": "坏结局·被闷死：绝望累积到两个标签后，木子因在夜里闷死了哥哥（玩家）。天亮后屋里再没有一点颜色与声音。此结局只由动态节点 n_hidden_smother 到达。",
+        "keywords": [
+          "坏结局",
+          "被闷死",
+          "绝望",
+          "没有颜色"
+        ],
+        "examples": [
+          "结束",
+          "就这样吧"
+        ],
+        "negatives": [],
+        "must_freeform": false
+      },
+      "background": "night_room"
     }
   }
 }

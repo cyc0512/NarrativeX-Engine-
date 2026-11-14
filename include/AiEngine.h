@@ -40,6 +40,19 @@ public:
             return "";
         }
 
+        // 👈 防御 1213：网关在用户 content 为空或纯空白时返回
+        //    「未正常接收到prompt参数」(1213)。advance()/「点击继续」会把空串送进 L2 路由，
+        //    此处短路，避免无效网络请求 + 误触 1213。三个调用点（路由/标签/台词）统一受益。
+        auto trim_in = [](const std::string& s) {
+            std::size_t a = s.find_first_not_of(" \t\r\n");
+            std::size_t b = s.find_last_not_of(" \t\r\n");
+            return (a == std::string::npos) ? std::string() : s.substr(a, b - a + 1);
+        };
+        if (trim_in(userInput).empty()) {
+            std::cerr << "【AiEngine】跳过请求：userInput 为空或纯空白，避免 1213。" << std::endl;
+            return "";
+        }
+
         // 👈 核心修复：URL 必须写域名！
         const std::string url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
         

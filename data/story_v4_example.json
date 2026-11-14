@@ -1,0 +1,99 @@
+{
+  "_comment": "FS v4 示例剧本（框架验证用，具体剧情由作者扩写）。演示三类节点 + 物品 + 四类触发。",
+  "phases": ["evening", "night", "morning"],
+  "entry": "n1_entry",
+  "nodes": {
+    "n1_entry": {
+      "type": "fixed", "kind": "scene", "speaker": "木子因", "timeline": 1,
+      "presentation": { "narrator": "放学回家，木子因在门口等你。", "npc_text": "哥，你回来啦。", "speaker": "木子因" },
+      "intent": { "description": "开场，玩家选择如何对待木子因" },
+      "options": [
+        { "text": "摸摸她的头", "next": "n2_kind" },
+        { "text": "径直回房", "next": "n2_cold" }
+      ]
+    },
+    "n2_kind": {
+      "type": "fixed", "kind": "scene", "timeline": 2,
+      "presentation": { "narrator": "她眯起眼睛笑。", "npc_text": "哥最好了。", "speaker": "木子因" },
+      "intent": { "description": "玩家态度温和，进入温馨线" },
+      "options": [
+        { "text": "继续聊", "next": "n_boss_call" },
+        { "text": "去写作业", "next": "n_boss_call" }
+      ]
+    },
+    "n2_cold": {
+      "type": "fixed", "kind": "scene", "timeline": 2,
+      "presentation": { "narrator": "她抿着嘴没说话。", "npc_text": "...哦。", "speaker": "木子因" },
+      "intent": { "description": "玩家态度冷淡，进入疏离线" },
+      "options": [ { "text": "沉默", "next": "n_boss_call" } ]
+    },
+    "n_boss_call": {
+      "type": "fixed", "kind": "scene", "timeline": 3,
+      "presentation": { "narrator": "电话响起，是老板。", "npc_text": "明天有个急活，你来趟公司。", "speaker": "老板" },
+      "intent": { "description": "老板来电，剧情分叉点" },
+      "effects": { "add_tags": ["numbness"] },
+      "options": [
+        { "text": "答应", "next": "n_client_meal" },
+        { "text": "拒绝", "next": "n_decline" }
+      ]
+    },
+    "n_client_meal": {
+      "type": "fixed", "kind": "scene", "timeline": 4,
+      "presentation": { "narrator": "和客户吃饭，气氛微妙。", "npc_text": "合作愉快。", "speaker": "客户" },
+      "intent": { "description": "与客户进餐，获得关键物品" },
+      "effects": { "add_items": ["key"] },
+      "options": [ { "text": "收下礼物", "next": "n4_silence" } ]
+    },
+    "n_decline": {
+      "type": "fixed", "kind": "scene", "timeline": 4,
+      "presentation": { "narrator": "你婉拒了老板。", "npc_text": "...那好吧。", "speaker": "老板" },
+      "intent": { "description": "拒绝老板，走另一条线" },
+      "options": [ { "text": "回家", "next": "n4_silence" } ]
+    },
+    "n4_silence": {
+      "type": "fixed", "kind": "scene", "timeline": 5,
+      "presentation": { "narrator": "回家后，空气很安静。", "npc_text": "哥，你今天话好少。", "speaker": "木子因" },
+      "intent": { "description": "回家后的沉默场景" },
+      "options": [
+        { "text": "抱抱她", "next": "n_reunion" },
+        { "text": "不说话", "next": "end_good" }
+      ]
+    },
+    "n_hidden_smother": {
+      "type": "dynamic", "kind": "ending", "timeline": 6, "init_after": "n_boss_call",
+      "trigger": { "tags_all": ["numbness", "heartbroken"] },
+      "presentation": { "narrator": "她在你睡熟后，用枕头蒙住了你的脸。", "npc_text": "...", "speaker": "木子因" },
+      "intent": { "description": "隐藏坏结局：在麻木+心碎标签齐备后由时间线武装触发" },
+      "default_next": "-1"
+    },
+    "n_letter": {
+      "type": "preposable", "kind": "scene", "timeline": 5, "insert_at": ["n4_silence", "n_client_meal"],
+      "trigger": { "tags_any": ["lonely"] },
+      "presentation": { "narrator": "你收到一封旧信。", "npc_text": "哥，如果你看到这封信……", "speaker": "木子因" },
+      "intent": { "description": "可前置节点：仅在锚点 n4_silence/n_client_meal 处且持有 lonely 标签时可插入" },
+      "options": [ { "text": "读信", "next": "n_reunion" } ]
+    },
+    "n_reunion": {
+      "type": "fixed", "kind": "ending", "timeline": 7,
+      "presentation": { "narrator": "你们终于说开了。", "npc_text": "哥，别离开我。", "speaker": "木子因" },
+      "intent": { "description": "好结局" },
+      "default_next": "-1"
+    },
+    "end_good": {
+      "type": "fixed", "kind": "ending", "timeline": 8,
+      "presentation": { "narrator": "平凡的一夜过去。", "npc_text": "...晚安。", "speaker": "木子因" },
+      "intent": { "description": "平静结局" },
+      "default_next": "-1"
+    },
+    "fallback": {
+      "type": "fixed", "kind": "fallback",
+      "presentation": { "narrator": "（她静静地看着你。）", "npc_text": "……", "speaker": "木子因" },
+      "intent": { "description": "兜底闲聊，防死锁" }
+    },
+    "-1": {
+      "type": "fixed", "kind": "ending", "terminal": true,
+      "presentation": { "narrator": "（剧终）", "npc_text": "……", "speaker": "木子因" },
+      "intent": { "description": "终局收束节点（terminal sink），所有结局经此收束" }
+    }
+  }
+}

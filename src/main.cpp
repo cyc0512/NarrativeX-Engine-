@@ -45,14 +45,15 @@ int main() {
                 // 阶段 1：节点展示（旁白翻页 + 选项打印）
                 // 只有进入新节点时，才会执行这一段
                 // ========================================================
-                std::vector<std::string> pages = engine.getCurrentNodePages();
+                auto pages = engine.getCurrentNodePages();
 
                 newt = oldt;
                 newt.c_lflag &= ~(ICANON | ECHO);
                 tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
                 for (const auto& page : pages) {
-                    std::cout << "\n" << page;
+                    if (!page.speaker.empty()) std::cout << "\n[" << page.speaker << "] ";
+                    std::cout << page.text;
                     std::cout << "\033[90m(按空格键继续...)\033[0m";
 
                     char ch = std::cin.get();
