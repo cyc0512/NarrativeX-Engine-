@@ -38,6 +38,8 @@
 #include "EngineAdapter.h"
 #include <QtConcurrent>
 #include <QFutureWatcher>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 // 背景层：按当前 size() 以 KeepAspectRatioByExpanding 绘制 ../assets/bg_<key>.jpg，
 // 缺图时回退到 ../assets/bg.jpg；其上叠深色半透明遮罩保证文字可读；图片缺失时画纯色底。
@@ -169,8 +171,42 @@ protected:
     }
 };
 
+// 可调参数：从项目根 config.json 读取；缺省值与原写死行为保持一致，
+// 用户无需重编译即可调整昼夜阈值 / 名字长度 / 存档位数等（UI 跟着参数与剧本规模自适应）。
+struct AppConfig {
+    int dayStartHour = 6;     // 白天起始（含）
+    int dayEndHour   = 18;    // 白天结束（不含）
+    int maxNameLen   = 24;    // 玩家名最大长度
+    int maxSaveSlots = 3;     // 读档页展示的存档位数量
+};
+
+static AppConfig loadAppConfig() {
+    AppConfig cfg;
+    // 候选路径与 EngineAdapter::resolveDataPath 思路一致：尽量定位 ~/fs/config.json
+    const QStringList cands = {
+        QStringLiteral("config.json"),
+        QStringLiteral("../config.json"),
+        QStringLiteral("../../config.json")
+    };
+    for (const QString& p : cands) {
+        QFile f(p);
+        if (!f.open(QIODevice::ReadOnly)) continue;
+        QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+        f.close();
+        if (!doc.isObject()) continue;
+        QJsonObject o = doc.object();
+        if (o.contains("day_start_hour") && o["day_start_hour"].isDouble()) cfg.dayStartHour = o["day_start_hour"].toInt();
+        if (o.contains("day_end_hour")   && o["day_end_hour"].isDouble())   cfg.dayEndHour   = o["day_end_hour"].toInt();
+        if (o.contains("max_name_length") && o["max_name_length"].isDouble()) cfg.maxNameLen  = o["max_name_length"].toInt();
+        if (o.contains("max_save_slots")  && o["max_save_slots"].isDouble())  cfg.maxSaveSlots = o["max_save_slots"].toInt();
+        break;  // 读到第一个有效文件即可
+    }
+    return cfg;
+}
+
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
+    AppConfig cfg = loadAppConfig();
 
     // 视觉增强：QSS 加载失败静默跳过，不作为运行前提。
     {
@@ -221,7 +257,7 @@ int main(int argc, char *argv[]) {
     auto switchToMenu = [&]() {
         // 每次返回主菜单都按当前系统时间重新判定昼夜，实现“自动切换”
         const int hour = QTime::currentTime().hour();
-        menuIsNight = !(hour >= 6 && hour < 18);
+        menuIsNight = !(hour >= cfg.dayStartHour && hour < cfg.dayEndHour);
         window.setScene(menuSceneKey());
         stackedWidget->setCurrentWidget(mainMenuPage);
     };
@@ -347,8 +383,8 @@ int main(int argc, char *argv[]) {
     namePanelLayout->addWidget(nameHint);
     QLineEdit *nameInput = new QLineEdit(namePanel);
     nameInput->setObjectName("NameInput");
-    nameInput->setPlaceholderText("在此输入名字（最多 24 字）");
-    nameInput->setMaxLength(24);
+    nameInput->setPlaceholderText(QStringLiteral("在此输入名字（最多 %1 字）").arg(cfg.maxNameLen));
+    nameInput->setMaxLength(cfg.maxNameLen);
     nameInput->setAlignment(Qt::AlignCenter);
     namePanelLayout->addWidget(nameInput);
     ngPanelLayout->addWidget(namePanel);
@@ -389,7 +425,7 @@ int main(int argc, char *argv[]) {
     endingTitle->setAlignment(Qt::AlignCenter);
     endingPanelLayout->addWidget(endingTitle);
 
-    QLabel *endingStat = new QLabel("已收录 0 / 7", endingPanel);
+    QLabel *endingStat = new QLabel(QStringLiteral("已收录 0 / %1").arg(static_cast<int>(engine.getEndingGallery().size())), endingPanel);
     endingStat->setObjectName("GalleryStat");
     endingStat->setAlignment(Qt::AlignCenter);
     endingPanelLayout->addWidget(endingStat);
@@ -399,7 +435,7 @@ int main(int argc, char *argv[]) {
     endingScroll->setObjectName("EndingScroll");
     endingScroll->setWidgetResizable(true);
     // 不设最小高度时 QScrollArea 的 sizeHint 会把 viewport 压到几十像素，
-    // 7 张卡片只剩缩略图顶边可见；440 保证约两行卡片完整显示且可滚动。
+    // 卡片数量随结局数变化，440 保证约两行卡片完整显示且可滚动。
     endingScroll->setMinimumHeight(440);
     endingScroll->viewport()->setObjectName("EndingScrollViewport");
     endingScroll->viewport()->setAutoFillBackground(false);
@@ -665,7 +701,7 @@ int main(int argc, char *argv[]) {
     };
 
     // ==========================================
-    // 页面 5：登录过场 CG（轻量版，复用现有图；3 屏淡入淡出）
+    // 页面 5：登录过场 CG（轻量版，复用现有图；屏数由 introImages 数组长度推导）
     // ==========================================
     QWidget *introPage = new QWidget();
     introPage->setObjectName("IntroPage");
@@ -708,6 +744,8 @@ int main(int argc, char *argv[]) {
         "她把碗沿擦得干干净净，像要把这清苦的日子也一并擦亮。",
         "明天，是她的家长会。"
     };
+    // 过场屏数由 introImages 数组长度推导；在 introImages 里增删一屏即自动适配，无需改其它常量。
+    const int kIntroScreens = static_cast<int>(sizeof(introImages) / sizeof(introImages[0]));
 
     QPixmap introBase;
     auto applyIntroImage = [&]() {
@@ -725,7 +763,7 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    int introStep = -1;          // -1 未播放；0..2 当前屏；>=3 已结束
+    int introStep = -1;          // -1 未播放；0..kIntroScreens-1 当前屏；>=kIntroScreens 已结束
     bool introActive = false;    // 跳过门控 + pending singleShot 取消语义
     std::function<void()> finishIntro;
     std::function<void(int)> showIntroStep;
@@ -750,7 +788,7 @@ int main(int argc, char *argv[]) {
         introAnim->start();
         QTimer::singleShot(1400, &app, [&, step]() {
             if (!introActive || step != introStep) return;
-            if (step + 1 >= 3) { finishIntro(); return; }
+            if (step + 1 >= kIntroScreens) { finishIntro(); return; }
             ++introStep;
             showIntroStep(introStep);
         });
@@ -900,10 +938,10 @@ int main(int argc, char *argv[]) {
         switchToMenu();                 // 含昼夜背景自动判定 + 切主菜单
     } else {
         const int hour = QTime::currentTime().hour();
-        menuIsNight = !(hour >= 6 && hour < 18);
+        menuIsNight = !(hour >= cfg.dayStartHour && hour < cfg.dayEndHour);
         window.setScene(menuSceneKey());
         stackedWidget->setCurrentWidget(introPage);
-        startIntro();                   // 正常启动才播放 3 屏过场
+        startIntro();                   // 正常启动才播放 kIntroScreens 屏过场
     }
 
     // ==========================================
@@ -1079,7 +1117,7 @@ int main(int argc, char *argv[]) {
 
         std::vector<DatabaseManager::SaveInfo> saves = engine.getAllSaves();
 
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < cfg.maxSaveSlots; ++i) {
             QWidget *slotWidget = new QWidget();
             slotWidget->setObjectName("SaveSlot");
             slotWidget->setMinimumWidth(500);

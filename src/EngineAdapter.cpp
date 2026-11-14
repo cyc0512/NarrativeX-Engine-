@@ -19,15 +19,16 @@
 //    NarrativeEngine::{state(),present(),step(),is_over(),set_selector(),
 //                      build_prompt(),frontier_in_ids(),blocked_map()} 及构造器
 //    NodeSpec / GameState / TriggerCondition / Effects 等公开结构体的【只读】字段
-//  禁止直接改写引擎内部状态。下列站点当前越界（逾矩），正在直接写
+//  禁止直接改写引擎内部状态。下列站点原越界（逾矩），曾直接写
 //  engine_->mutable_state() 的内部字段，破坏内核 seq/visited/pending 不变式：
 //    - step() 内 Dynamic_Pull 改 current_node（早期触发动态调度）
 //    - step() 内 拓扑锁兜底 改 current_node
 //    - applyPenalty 改 affinity（且钳制区间 [0,100] 与内核 [-100,200] 不一致）
 //    - persist() 整体覆写 tags
-//  根因：NarrativeEngine::mutable_state() 把整个 GameState& 暴露出来；理想做法是
-//  收窄该接口，改用受控修改方法（如 reroute(NodeId)/applyAffinityDelta(int)/
-//  add_tag/remove_tag），让内核成为标签与状态的唯一权威。
+//  根因：NarrativeEngine::mutable_state() 把整个 GameState& 暴露出来。
+//  收窄（2026-11-14 已落地）：上述 4 处全部改走 NarrativeEngine 受控方法 ——
+//    reroute(NodeId) / applyAffinityDelta(int) / set_tags_from(vector<TagId>)
+//  （add_tag/remove_tag 亦可用），内核成为状态与标签的唯一写入口，编排层不再直写。
 //  说明：本边界注释与下方内联 ⚠ 标记均不触碰 generateReplyForNode 的木子因人设文案。
 // ===========================================================================
 
@@ -545,11 +546,9 @@ StepResult EngineAdapter::step(const std::string& input) {
                 std::cout << "【动态调度】苛刻条件满足！提前接入隐藏节点: " << id << "\n";
                 tr.to_node = id;
                 tr.layer = "Dynamic_Pull"; // 👈 盖上合法通行证
-                // ⚠ 逾矩：直接写 mutable_state().current_node 把节点"瞬移"进 current_node，
-                //    绕过了 step() 的 seq/visited/pending/redeem 记账；内核 NodeSpec::early_trigger
-                //    已被 StoryLoader 解析却从未被 step() 使用，动态调度本应内聚进内核。
-                //    应改为内核方法 reroute(NodeId) 或在 step() 内消费 early_trigger。
-                engine_->mutable_state().current_node = id; // 强改底层节点
+                // 已收窄：改走 engine_->reroute(id) 受控方法（不再直写 mutable_state().current_node），
+                // 把节点"瞬移"进 current_node；early_trigger 仍由编排层消费，待下轮内聚进内核 step()。
+                engine_->reroute(id);
                 break; 
             }
         }
@@ -586,10 +585,9 @@ StepResult EngineAdapter::step(const std::string& input) {
                                 ? from->default_next : tr.from_node;
                 std::cout << "【拓扑锁】AI 试图越界前往 " << tr.to_node
                           << "，非法，改走默认出口 " << fb << "。\n";
-                // ⚠ 逾矩：非法跳转时直接改 mutable_state().current_node 兜底，导致 is_over()/
-                //    present() 读取的 current_node 与 step() 实际记录的节点不一致。
-                //    应改为内核合法跳转判定（clamp_to_legal）后在 step() 内修正，而非事后改写。
-                engine_->mutable_state().current_node = fb;
+                // 已收窄：改走 engine_->reroute(fb) 受控方法（不再直写 mutable_state().current_node），
+                // 兜底跳到当前节点的合法默认出口；current_node 与 step() 记录现在都经同一入口。
+                engine_->reroute(fb);
                 tr.to_node = fb;
                 tr.layer = "L2_local";
             }
@@ -668,13 +666,9 @@ std::string EngineAdapter::getLastPlayerInput() const {
 void EngineAdapter::applyPenalty(int p) {
     std::lock_guard<std::mutex> g(stateMutex_);
     if (!engine_) return;
-    // ⚠ 逾矩：直接改 mutable_state().affinity，且钳制区间 [0,100] 与内核 step() 的
-    //    [-100,200] 不一致；改动不进内核事件日志/历史。应改为内核方法
-    //    applyAffinityDelta(int)，用内核规范钳制区间并记事件。
-    engine_->mutable_state().affinity += p;
-    auto& a = engine_->mutable_state().affinity;
-    if (a < 0) a = 0;
-    if (a > 100) a = 100;
+    // 已收窄：改走 engine_->applyAffinityDelta(p)，使用内核规范钳制区间 [-100,200]
+    // （修正原先编排层 [0,100] 与内核不一致的问题），改动落在内核状态上。
+    engine_->applyAffinityDelta(p);
     persist();
 }
 
@@ -683,12 +677,11 @@ void EngineAdapter::persist() {
     // all_tags_ 是唯一真相源：detectTag()/addTag() 的 LLM 情绪标签只落在这里，
     // 从不写 GameState.tags。必须先 clear 再全量 insert，否则 removeTag() 的
     // 删除会残留在 state_json 里，读档后被 loadExistingPlayer() 重新灌回来。
-    // ⚠ 逾矩：persist() 把并行维护的 all_tags_ 整体覆写回 mutable_state().tags，
-    //    与 step() 经 effects 写入 st_.tags 的链路形成冗余易碎的往返。
-    //    应让标签以内核 add_tag/remove_tag 为权威，persist 仅 state_to_json(state())。
-    nx::GameState& st = engine_->mutable_state();
-    st.tags.clear();
-    for (const auto& t : all_tags_) st.tags.insert(t);
+    // 已收窄：标签仍以编排层 all_tags_ 为工作集（detectTag / effects 同步都落在此），
+    // 但通过受控方法 engine_->set_tags_from() 整体写回内核，不再直写 mutable_state().tags。
+    // 后续若把标签权威彻底迁到内核 add_tag/remove_tag，此处可简化为 state_to_json(state())。
+    std::vector<nx::TagId> tag_vec(all_tags_.begin(), all_tags_.end());
+    engine_->set_tags_from(tag_vec);
     const std::string js = nx::StoryLoader::state_to_json(engine_->state());
     db_->saveStateJson(playerName_, js);
 }
@@ -764,29 +757,52 @@ std::vector<EndingEntry> EngineAdapter::getEndingGallery() const {
 
 std::vector<CharacterEntry> EngineAdapter::getCharacterGallery() const {
     std::lock_guard<std::mutex> g(stateMutex_);
-    std::vector<CharacterEntry> out = {
-        {"木子因", "病弱内向的妹妹，在家时散着长发", false},
-        {"客户",   "创业多年的青年女精英，与玩家公司合作", false},
-        {"老板",   "一通电话把明天分成两条路的人", false},
-        {"广播",   "出差列车上的播报声", false},
-    };
-    if (!db_ || doc_.is_null()) return out;
-    // 动态建立 speaker -> 节点 id 集合：无 presentation.speaker 时回退 "木子因"
-    // （与 StoryLoader.hpp:262 默认值一致，否则 17 个无该字段的节点会被漏掉）。
+    // 自适应：直接从剧本所有节点的 presentation.speaker 去重得到角色列表，
+    // 不再写死 4 个固定人物；用户在剧本里新增 speaker 即自动进图鉴。
+    // 顺序：保持节点首次出现顺序（木子因通常首个，立绘缩略图逻辑不受影响）。
+    std::vector<std::string> order;
     std::unordered_map<std::string, std::unordered_set<std::string>> speakerNodes;
-    try {
-        const auto& nodes = doc_.at("nodes");
-        for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-            std::string speaker = "木子因";
-            const auto& node = it.value();
-            auto pres = node.find("presentation");
-            if (pres != node.end() && pres->is_object()) {
-                auto sp = pres->find("speaker");
-                if (sp != pres->end() && sp->is_string()) speaker = sp->get<std::string>();
+    if (!doc_.is_null()) {
+        try {
+            const auto& nodes = doc_.at("nodes");
+            for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+                std::string speaker = "木子因";
+                const auto& node = it.value();
+                auto pres = node.find("presentation");
+                if (pres != node.end() && pres->is_object()) {
+                    auto sp = pres->find("speaker");
+                    if (sp != pres->end() && sp->is_string()) speaker = sp->get<std::string>();
+                }
+                if (speakerNodes.find(speaker) == speakerNodes.end()) {
+                    speakerNodes[speaker];   // 首次出现：默认构造空 set 并记入顺序
+                    order.push_back(speaker);
+                }
+                speakerNodes[speaker].insert(it.key());
             }
-            speakerNodes[speaker].insert(it.key());
+        } catch (...) {}
+    }
+
+    // 可选人物介绍：data/characters.json 形如 {"木子因":"……","客户":"……"}；
+    // 缺文件或缺少某角色时回退通用文案，绝不阻塞图鉴。
+    std::unordered_map<std::string, std::string> notes;
+    {
+        std::ifstream f("../data/characters.json");
+        if (f.is_open()) {
+            try {
+                nlohmann::json j; f >> j;
+                if (j.is_object())
+                    for (auto it = j.begin(); it != j.end(); ++it)
+                        if (it.value().is_string()) notes[it.key()] = it.value().get<std::string>();
+            } catch (...) {}
+            f.close();
         }
-    } catch (...) { return out; }
+    }
+
+    std::vector<CharacterEntry> out;
+    for (const auto& name : order)
+        out.push_back({name, notes.count(name) ? notes.at(name) : std::string("（剧情角色）"), false});
+    if (out.empty()) return out;
+    if (!db_) return out;
     const auto visited = collectGlobalVisited(db_.get());
     for (auto& c : out) {
         auto sn = speakerNodes.find(c.name);

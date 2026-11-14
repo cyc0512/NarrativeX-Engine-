@@ -83,6 +83,24 @@ public:
     const GameState& state() const noexcept { return st_; }
     GameState& mutable_state() noexcept { return st_; }
     const Catalog& catalog() const noexcept { return cat_; }
+
+    // ---- 受控状态修改方法（替代直接 mutable_state() 写入，收窄编排层越界）----
+    // 编排层（EngineAdapter）只应通过以下方法改动内核状态；mutable_state() 保留供
+    // 只读 / 构造使用，不再由应用层做写操作。2026-11-14 落地：原先 4 处直写
+    // mutable_state() 的逾矩站点（Dynamic_Pull / 拓扑锁兜底 / applyPenalty / persist）
+    // 已全部改走下列方法。
+    void reroute(const NodeId& id) noexcept { st_.current_node = id; }
+    void applyAffinityDelta(int d) noexcept {
+        st_.affinity += d;
+        if (st_.affinity < -100) st_.affinity = -100;   // 与 step() 内核钳制区间一致
+        if (st_.affinity >  200) st_.affinity =  200;
+    }
+    void add_tag(const TagId& t)    { st_.tags.insert(t); }
+    void remove_tag(const TagId& t) { st_.tags.erase(t); }
+    void set_tags_from(const std::vector<TagId>& tags) {
+        st_.tags.clear();
+        for (const auto& t : tags) st_.tags.insert(t);
+    }
     FrontierScorer& scorer() noexcept { return scorer_; }
     IntentMatcher& matcher() noexcept { return matcher_; }
     PromptAssembler& prompter() noexcept { return prompter_; }
